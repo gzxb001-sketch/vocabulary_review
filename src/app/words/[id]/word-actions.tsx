@@ -84,7 +84,7 @@ export default function WordActions(props: WordActionsProps) {
       <h2 className="section-title">编辑词条</h2>
 
       {!editing ? (
-        <div className="action-row-inline" style={{ display: "grid", gap: "10px", gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+        <div className="action-row-inline action-row">
           <button className="button button-secondary" onClick={() => setEditing(true)}>编辑</button>
           <button className="button button-danger" onClick={handleDelete} disabled={deleting}>
             {deleting ? "删除中..." : "删除"}
@@ -123,7 +123,7 @@ export default function WordActions(props: WordActionsProps) {
 
           {error ? <p className="muted">{error}</p> : null}
 
-          <div className="action-row-inline" style={{ display: "grid", gap: "10px", gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+          <div className="action-row-inline action-row">
             <button className="button" onClick={handleSave} disabled={saving}>{saving ? "保存中..." : "保存修改"}</button>
             <button className="button button-secondary" onClick={() => { setEditing(false); setError(""); }}>取消</button>
           </div>

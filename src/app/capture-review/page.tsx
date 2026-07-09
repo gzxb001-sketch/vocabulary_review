@@ -92,7 +92,7 @@ export default function CaptureReviewPage() {
             <div className="card">
               <h2 className="section-title">批量操作</h2>
               <div className="stack">
-                <div className="action-row-inline" style={{ display: "grid", gap: "10px", gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+                <div className="action-row-inline action-row">
                   <button className="button button-secondary" onClick={() => setAllSelected(true)}>全选</button>
                   <button className="button button-secondary" onClick={() => setAllSelected(false)}>全不选</button>
                 </div>

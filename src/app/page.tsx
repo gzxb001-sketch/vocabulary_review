@@ -30,12 +30,12 @@ async function getHomeData() {
     prisma.word.findMany({
       orderBy: { createdAt: "desc" },
       include: { sources: { orderBy: { createdAt: "desc" }, take: 1 } },
-      take: 5,
+      take: 15,
     }),
     prisma.review.findMany({
       include: { word: true },
       orderBy: { reviewedAt: "desc" },
-      take: 5,
+      take: 15,
     }),
     prisma.wordSource.groupBy({
       by: ["sourceType"],
@@ -67,119 +67,107 @@ export default async function HomePage() {
   const data = await getHomeData();
 
   return (
-    <main className="container fade-in">
-      <div className="card stack">
-        <h1 className="title">早安</h1>
-        <p className="subtitle">今天还有 {data.dueCount} 个词等你复习。</p>
-
-        <div className="summary-grid">
-          <div className="summary-card">
-            <span className="summary-label">总词条</span>
-            <strong className="summary-value">{data.totalWordsCount}</strong>
-          </div>
-          <div className="summary-card">
-            <span className="summary-label">今日新增</span>
-            <strong className="summary-value">{data.todayAddedCount}</strong>
-          </div>
-          <div className="summary-card">
-            <span className="summary-label">待复习</span>
-            <strong className="summary-value">{data.dueCount}</strong>
-          </div>
-          <div className="summary-card">
-            <span className="summary-label">今日已复习</span>
-            <strong className="summary-value">{data.todayReviewedCount}</strong>
-          </div>
+    <main className="container">
+      {/* Hero */}
+      <section className="hero-card-home">
+        <p className="hero-brand">竹墨词库</p>
+        {data.dueCount > 0 ? (
+          <>
+            <p className="hero-due-count">{data.dueCount}</p>
+            <p className="hero-due-label">个词待复习</p>
+          </>
+        ) : (
+          <p className="hero-due-label">今天没有待复习</p>
+        )}
+        <div className="hero-btns">
+          <Link href="/review" className="hero-btn-primary">开始复习</Link>
+          <Link href="/manual" className="hero-btn-secondary">手动录词</Link>
+          <Link href="/capture" className="hero-btn-secondary">拍照录词</Link>
         </div>
+      </section>
 
-        <div className="dashboard-note">
-          {data.dueCount > 0
-            ? `先完成 ${data.dueCount} 个待复习词，再补录今天遇到的新词。`
-            : "今天没有到期词，趁现在录新词或回顾最近新增。"}
+      {/* Stats */}
+      <section className="home-stats-row">
+        <div className="home-stat-card">
+          <span className="home-stat-num">{data.totalWordsCount}</span>
+          <span className="home-stat-label">词条总数</span>
         </div>
+        <div className="home-stat-card is-due">
+          <span className="home-stat-num">{data.dueCount}</span>
+          <span className="home-stat-label">待复习</span>
+        </div>
+        <div className="home-stat-card">
+          <span className="home-stat-num">{data.todayAddedCount}</span>
+          <span className="home-stat-label">今日新增</span>
+        </div>
+        <div className="home-stat-card">
+          <span className="home-stat-num">{data.todayReviewedCount}</span>
+          <span className="home-stat-label">今日复习</span>
+        </div>
+      </section>
 
-        <div className="link-row">
-          <Link href="/review" className="link-button">
-            开始复习
-          </Link>
-          <Link href="/manual" className="link-button secondary">
-            手动录词
-          </Link>
-          <Link href="/capture" className="link-button secondary">
-            拍照录词
-          </Link>
-          <Link href="/words" className="link-button secondary">
-            词库
-          </Link>
-          <Link href="/words?filter=due" className="link-button secondary">
-            查看待复习词
-          </Link>
-        </div>
+      {/* 竹节分隔 */}
+      <div className="bamboo-divider">
+        <span className="bamboo-divider-icon" />
       </div>
 
-      <div style={{ height: 16 }} />
+      {/* 最近 */}
+      <section className="home-two-col">
+        <div className="card home-col-card">
+          <div className="home-col-header">
+            <h2 className="home-section-title">最近新增</h2>
+            <Link href="/words/recent" className="home-col-more">全部 →</Link>
+          </div>
+          {data.recentWords.length === 0 ? (
+            <p className="empty-hint">还没有词条</p>
+          ) : (
+            <div className="home-tag-cloud">
+              {data.recentWords.map((word) => (
+                <Link key={word.id} href={`/words/${word.id}`} className="home-word-tag">
+                  {word.displayText}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
 
-      <div className="card">
-        <h2 className="section-title">来源分布</h2>
+        <div className="card home-col-card">
+          <div className="home-col-header">
+            <h2 className="home-section-title">最近复习</h2>
+            <Link href="/review" className="home-col-more">全部 →</Link>
+          </div>
+          {data.recentReviews.length === 0 ? (
+            <p className="empty-hint">还没有复习记录</p>
+          ) : (
+            <div className="home-tag-cloud">
+              {data.recentReviews.map((review) => (
+                <Link
+                  key={review.id}
+                  href={`/words/${review.word.id}`}
+                  className={`home-word-tag tag-${review.reviewResult}`}
+                >
+                  {review.word.displayText}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
 
-        {data.sourceDistribution.length === 0 ? (
-          <p className="muted">录词后这里会显示你主要从哪里积累生词。</p>
-        ) : (
-          <div className="tag-grid">
+      {/* 来源分布 */}
+      {data.sourceDistribution.length > 0 && (
+        <details className="source-detail">
+          <summary className="source-detail-summary">来源分布</summary>
+          <div className="source-tag-row">
             {data.sourceDistribution.map((item) => (
-              <div key={item.sourceType} className="list-card">
-                <strong>{SOURCE_LABELS[item.sourceType] || item.sourceType}</strong>
-                <span className="muted">{item._count.sourceType} 条</span>
-              </div>
+              <span key={item.sourceType} className="source-tag">
+                {SOURCE_LABELS[item.sourceType] || item.sourceType}
+                <em>{item._count.sourceType}</em>
+              </span>
             ))}
           </div>
-        )}
-      </div>
-
-      <div style={{ height: 16 }} />
-
-      <div className="card">
-        <h2 className="section-title">最近新增</h2>
-
-        <div className="stack">
-          {data.recentWords.length === 0 ? (
-            <p className="muted">还没有词条，先去录入第一个词。</p>
-          ) : (
-            data.recentWords.map((word) => (
-              <Link key={word.id} href={`/words/${word.id}`} className="list-card">
-                <strong>{word.displayText}</strong>
-                <div className="muted">{word.meaningZh || "暂无释义"}</div>
-                {word.sources[0]?.sourceType ? (
-                  <span className="muted">来源：{SOURCE_LABELS[word.sources[0].sourceType] || word.sources[0].sourceType}</span>
-                ) : null}
-              </Link>
-            ))
-          )}
-        </div>
-      </div>
-
-      <div style={{ height: 16 }} />
-
-      <div className="card">
-        <h2 className="section-title">最近复习</h2>
-
-        <div className="stack">
-          {data.recentReviews.length === 0 ? (
-            <p className="muted">还没有复习记录，先去完成今天的第一轮复习。</p>
-          ) : (
-            data.recentReviews.map((review) => (
-              <div key={review.id} className="list-card">
-                <strong>{review.word.displayText}</strong>
-                <span className={`result-chip ${review.reviewResult}`}>
-                  {review.reviewResult === "known" ? "认识" : review.reviewResult === "vague" ? "模糊" : "忘记"}
-                </span>
-                <span className="muted">
-                  {new Date(review.reviewedAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}
-                </span>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+        </details>
+      )}
     </main>
   );
 }

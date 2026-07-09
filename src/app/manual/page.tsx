@@ -4,6 +4,16 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 type SourceType = "manual" | "exam" | "reading" | "lecture" | "other";
+
+type MeaningEntry = {
+  partOfSpeech: string;
+  meaningZh: string;
+  exampleSentence?: string;
+  exampleTranslation?: string;
+  isObscure: boolean;
+  isHighFreq: boolean;
+};
+
 type EnrichItem = {
   text: string;
   lemma?: string;
@@ -11,6 +21,7 @@ type EnrichItem = {
   phonetic?: string;
   partOfSpeech?: string;
   exampleSentence?: string;
+  meanings?: MeaningEntry[];
   found?: boolean;
 };
 
@@ -22,6 +33,7 @@ export default function ManualPage() {
   const [phonetic, setPhonetic] = useState("");
   const [partOfSpeech, setPartOfSpeech] = useState("");
   const [exampleSentence, setExampleSentence] = useState("");
+  const [meanings, setMeanings] = useState<MeaningEntry[]>([]);
   const [sourceType, setSourceType] = useState<SourceType>("manual");
   const [sourceNote, setSourceNote] = useState("");
   const [enriching, setEnriching] = useState(false);
@@ -30,148 +42,105 @@ export default function ManualPage() {
   const [hint, setHint] = useState("");
 
   async function handleEnrich() {
-    if (!displayText.trim()) {
-      setError("请先输入单词或短语");
-      return;
-    }
-
-    setError("");
-    setHint("");
-    setEnriching(true);
-
+    if (!displayText.trim()) { setError("请先输入单词或短语"); return; }
+    setError(""); setHint(""); setEnriching(true);
     try {
       const res = await fetch("/api/words/enrich", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ items: [{ text: displayText.trim() }] }),
       });
-
-      if (!res.ok) {
-        setError("自动补全失败，请稍后重试");
-        return;
-      }
-
+      if (!res.ok) { setError("自动补全失败，请稍后重试"); return; }
       const data = await res.json();
       const item: EnrichItem | undefined = data.items?.[0];
-
-      if (!item) {
-        setError("没有拿到补全结果");
-        return;
-      }
+      if (!item) { setError("没有拿到补全结果"); return; }
 
       setDisplayText(item.text || displayText.trim());
       setLemma(item.lemma || displayText.trim().toLowerCase());
-      setMeaningZh((prev) => prev || item.meaningZh || "");
+      setMeaningZh(item.meaningZh || "");
       setPhonetic(item.phonetic || "");
       setPartOfSpeech(item.partOfSpeech || "");
       setExampleSentence(item.exampleSentence || "");
-
-      if (!item.found) {
-        setHint("未查到完整词典结果，已保留基础词形，可手动补充释义后保存。");
-      }
-    } finally {
-      setEnriching(false);
-    }
+      setMeanings(item.meanings || []);
+      if (!item.found) setHint("未查到完整词典结果，已保留基础词形，可手动补充后保存。");
+    } finally { setEnriching(false); }
   }
 
   async function handleSave() {
-    if (!displayText.trim()) {
-      setError("请先输入单词或短语");
-      return;
-    }
-
-    setError("");
-    setSaving(true);
-
+    if (!displayText.trim()) { setError("请先输入单词或短语"); return; }
+    setError(""); setSaving(true);
     try {
       const res = await fetch("/api/words/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          items: [
-            {
-              displayText: displayText.trim(),
-              lemma: (lemma || displayText).trim().toLowerCase(),
-              meaningZh: meaningZh.trim(),
-              phonetic: phonetic.trim(),
-              partOfSpeech: partOfSpeech.trim(),
-              exampleSentence: exampleSentence.trim(),
-              source: { sourceType, sourceNote: sourceNote.trim() },
-            },
-          ],
+          items: [{
+            displayText: displayText.trim(),
+            lemma: (lemma || displayText).trim().toLowerCase(),
+            meaningZh: meaningZh.trim(),
+            phonetic: phonetic.trim(),
+            partOfSpeech: partOfSpeech.trim(),
+            exampleSentence: exampleSentence.trim(),
+            meanings: meanings.length > 0 ? meanings : undefined,
+            source: { sourceType, sourceNote: sourceNote.trim() },
+          }],
         }),
       });
-
-      if (!res.ok) {
-        setError("保存失败，请稍后重试");
-        return;
-      }
-
-      router.push("/");
-      router.refresh();
-    } finally {
-      setSaving(false);
-    }
+      if (!res.ok) { setError("保存失败，请稍后重试"); return; }
+      router.push("/"); router.refresh();
+    } finally { setSaving(false); }
   }
 
   return (
     <main className="container fade-in">
       <div className="card stack">
         <h1 className="title">手动录词</h1>
-        <p className="subtitle">输入单词或短语，系统会自动补全释义、音标和例句。</p>
+        <p className="subtitle">输入单词，系统会自动补全完整义项（含词性、释义、例句、熟词僻义）。</p>
 
         <div>
           <label className="label">单词或短语</label>
-          <input
-            className="input"
-            placeholder="例如 abandon / derive from"
-            value={displayText}
-            onChange={(e) => setDisplayText(e.target.value)}
-          />
+          <input className="input" placeholder="例如 abandon" value={displayText} onChange={(e) => setDisplayText(e.target.value)} />
         </div>
 
         <button className="button button-secondary" onClick={handleEnrich} disabled={enriching}>
           {enriching ? "补全中..." : "自动补全"}
         </button>
 
+        {/* 补全结果预览 */}
+        {meanings.length > 0 && (
+          <div className="meaning-preview">
+            <h3 className="section-title" style={{ marginBottom: "var(--space-2)" }}>
+              识别的义项（{meanings.length} 条）
+            </h3>
+            {meanings.map((m, i) => (
+              <div key={i} className={`meaning-item${m.isObscure ? " meaning-obscure" : ""}`}>
+                <div className="meaning-header">
+                  <span className="meta-chip">{m.partOfSpeech}</span>
+                  <strong className="meaning-zh">{m.meaningZh}</strong>
+                  {m.isHighFreq && <span className="highfreq-tag">高频</span>}
+                  {m.isObscure && <span className="obscure-tag">僻义</span>}
+                </div>
+                {m.exampleSentence && (
+                  <div>
+                    <p className="meaning-example">{m.exampleSentence}</p>
+                    {m.exampleTranslation && (
+                      <p className="meaning-trans">{m.exampleTranslation}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
         <div>
           <label className="label">最短中文义</label>
-          <input
-            className="input"
-            placeholder="例如 放弃"
-            value={meaningZh}
-            onChange={(e) => setMeaningZh(e.target.value)}
-          />
+          <input className="input" placeholder="如在列表中快速展示的意思" value={meaningZh} onChange={(e) => setMeaningZh(e.target.value)} />
         </div>
 
         <div>
           <label className="label">音标</label>
-          <input
-            className="input"
-            placeholder="例如 /əˈbændən/"
-            value={phonetic}
-            onChange={(e) => setPhonetic(e.target.value)}
-          />
-        </div>
-
-        <div>
-          <label className="label">词性</label>
-          <input
-            className="input"
-            placeholder="例如 verb"
-            value={partOfSpeech}
-            onChange={(e) => setPartOfSpeech(e.target.value)}
-          />
-        </div>
-
-        <div>
-          <label className="label">例句</label>
-          <textarea
-            className="textarea"
-            placeholder="可选"
-            value={exampleSentence}
-            onChange={(e) => setExampleSentence(e.target.value)}
-          />
+          <input className="input" placeholder="例如 /əˈbændən/" value={phonetic} onChange={(e) => setPhonetic(e.target.value)} />
         </div>
 
         <div>
@@ -187,12 +156,7 @@ export default function ManualPage() {
 
         <div>
           <label className="label">来源备注</label>
-          <input
-            className="input"
-            placeholder="例如 2024 英语一阅读"
-            value={sourceNote}
-            onChange={(e) => setSourceNote(e.target.value)}
-          />
+          <input className="input" placeholder="例如 2024 英语一阅读" value={sourceNote} onChange={(e) => setSourceNote(e.target.value)} />
         </div>
 
         {hint ? <p className="muted">{hint}</p> : null}

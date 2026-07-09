@@ -13,12 +13,8 @@ export async function GET() {
     include: {
       word: {
         include: {
-          sources: {
-            orderBy: {
-              createdAt: "desc",
-            },
-            take: 1,
-          },
+          sources: { orderBy: { createdAt: "desc" }, take: 1 },
+          meanings: { orderBy: { sortOrder: "asc" } },
         },
       },
     },
@@ -38,6 +34,14 @@ export async function GET() {
       exampleSentence: item.word.exampleSentence,
       sourceType: item.word.sources[0]?.sourceType ?? null,
       sourceNote: item.word.sources[0]?.sourceNote ?? null,
+      meanings: item.word.meanings.map((m) => ({
+        partOfSpeech: m.partOfSpeech,
+        meaningZh: m.meaningZh,
+        exampleSentence: m.exampleSentence,
+        exampleTranslation: m.exampleTranslation,
+        isObscure: m.isObscure,
+        isHighFreq: m.isHighFreq,
+      })),
     })),
   });
 }

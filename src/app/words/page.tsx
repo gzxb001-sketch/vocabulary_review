@@ -173,7 +173,7 @@ export default function WordsPage() {
         </div>
       </div>
 
-      <div style={{ height: 16 }} />
+      <div className="page-block" />
 
       <div className="card">
         <h2 className="section-title">词条列表</h2>

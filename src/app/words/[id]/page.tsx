@@ -23,28 +23,132 @@ async function getWordDetail(id: string) {
       sources: { orderBy: { createdAt: "desc" } },
       reviews: { orderBy: { reviewedAt: "desc" }, take: 10 },
       schedule: true,
+      meanings: { orderBy: { sortOrder: "asc" } },
     },
   });
 }
 
-export default async function WordDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function WordDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = await params;
   const word = await getWordDetail(id);
 
-  if (!word) { notFound(); }
+  if (!word) notFound();
+
+  const highFreqMeanings = word.meanings.filter((m) => m.isHighFreq);
+  const normalMeanings = word.meanings.filter((m) => !m.isHighFreq && !m.isObscure);
+  const lowObscureMeanings = word.meanings.filter((m) => m.isObscure && !m.isHighFreq);
 
   return (
     <main className="container fade-in">
+      {/* Word Header */}
       <div className="card stack">
-        <h1 className="word">{word.displayText}</h1>
-        <p className="meaning">{word.meaningZh || "暂无释义"}</p>
-        {word.phonetic ? <p className="phonetic">{word.phonetic}</p> : null}
-        {word.partOfSpeech ? <p className="muted">词性：{word.partOfSpeech}</p> : null}
-        {word.exampleSentence ? <p className="muted">例句：{word.exampleSentence}</p> : null}
-        {word.note ? <p className="muted">备注：{word.note}</p> : null}
+        <h1 className="word-display">{word.displayText}</h1>
+        {word.meaningZh && <p className="word-meaning">{word.meaningZh}</p>}
+        {word.phonetic && <p className="word-phonetic">{word.phonetic}</p>}
+        {word.note && <p className="muted">备注：{word.note}</p>}
       </div>
 
-      <div style={{ height: 16 }} />
+      <div className="page-block" />
+
+      {/* Meanings List */}
+      {word.meanings.length > 0 && (
+        <>
+          <div className="card stack">
+            <h2 className="section-title">义项详解</h2>
+
+            {/* 🔥 重点掌握 — 考研高频义项 */}
+            {highFreqMeanings.length > 0 && (
+              <div className="highlight-section">
+                <div className="section-tip">🔥 重点掌握</div>
+                {highFreqMeanings.map((m) => (
+                  <div key={m.id} className={`meaning-item meaning-highfreq${m.isObscure ? " meaning-obscure" : ""}`}>
+                    <div className="meaning-header">
+                      <span className="meta-chip">{m.partOfSpeech}</span>
+                      <strong className="meaning-zh">{m.meaningZh}</strong>
+                      <span className="highfreq-tag">高频</span>
+                      {m.isObscure && <span className="obscure-tag">僻义</span>}
+                    </div>
+                    {m.exampleSentence ? (
+                      <div className="meaning-body">
+                        <p className="meaning-example">{m.exampleSentence}</p>
+                        {m.exampleTranslation && (
+                          <p className="meaning-trans">{m.exampleTranslation}</p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="meaning-no-example">暂无例句</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* 一般义项 */}
+            {normalMeanings.length > 0 && (
+              <>
+                {highFreqMeanings.length > 0 && (
+                  <div className="section-sep">
+                    <span className="section-sep-label">其他义项</span>
+                  </div>
+                )}
+                {normalMeanings.map((m) => (
+                  <div key={m.id} className="meaning-item">
+                    <div className="meaning-header">
+                      <span className="meta-chip">{m.partOfSpeech}</span>
+                      <strong className="meaning-zh">{m.meaningZh}</strong>
+                    </div>
+                    {m.exampleSentence ? (
+                      <div className="meaning-body">
+                        <p className="meaning-example">{m.exampleSentence}</p>
+                        {m.exampleTranslation && (
+                          <p className="meaning-trans">{m.exampleTranslation}</p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="meaning-no-example">暂无例句</p>
+                    )}
+                  </div>
+                ))}
+              </>
+            )}
+
+            {/* 熟词僻义（非高频） */}
+            {lowObscureMeanings.length > 0 && (
+              <details className="obscure-section">
+                <summary className="obscure-toggle">
+                  ⚠️ 熟词僻义 — {lowObscureMeanings.length} 条
+                </summary>
+                <div className="stack" style={{ marginTop: "var(--space-3)" }}>
+                  {lowObscureMeanings.map((m) => (
+                    <div key={m.id} className="meaning-item meaning-obscure">
+                      <div className="meaning-header">
+                        <span className="meta-chip">{m.partOfSpeech}</span>
+                        <strong className="meaning-zh">{m.meaningZh}</strong>
+                        <span className="obscure-tag">僻义</span>
+                      </div>
+                      {m.exampleSentence ? (
+                        <div className="meaning-body">
+                          <p className="meaning-example">{m.exampleSentence}</p>
+                          {m.exampleTranslation && (
+                            <p className="meaning-trans">{m.exampleTranslation}</p>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="meaning-no-example">暂无例句</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+          </div>
+          <div className="page-block" />
+        </>
+      )}
 
       <WordActions
         id={word.id}
@@ -57,20 +161,40 @@ export default async function WordDetailPage({ params }: { params: Promise<{ id:
         note={word.note}
       />
 
-      <div style={{ height: 16 }} />
+      <div className="page-block" />
 
+      {/* Review Schedule */}
       <div className="card stack">
         <h2 className="section-title">当前复习状态</h2>
-        <p className="muted">
-          下次复习：{word.schedule?.nextReviewAt ? new Date(word.schedule.nextReviewAt).toLocaleString() : "未安排"}
-        </p>
-        <p className="muted">当前间隔：{word.schedule?.intervalDays ?? 0} 天</p>
-        <p className="muted">复习次数：{word.schedule?.reviewCount ?? 0}</p>
-        <p className="muted">上次结果：{word.schedule?.lastResult ? RESULT_LABELS[word.schedule.lastResult] || word.schedule.lastResult : "无"}</p>
+        <div className="stat-grid">
+          <div className="stat-item">
+            <div className="stat-label">下次复习</div>
+            <div className="stat-value">
+              {word.schedule?.nextReviewAt
+                ? new Date(word.schedule.nextReviewAt).toLocaleDateString("zh-CN", { month: "short", day: "numeric" })
+                : "未安排"}
+            </div>
+          </div>
+          <div className="stat-item">
+            <div className="stat-label">当前间隔</div>
+            <div className="stat-value">{word.schedule?.intervalDays ?? 0} 天</div>
+          </div>
+          <div className="stat-item">
+            <div className="stat-label">复习次数</div>
+            <div className="stat-value">{word.schedule?.reviewCount ?? 0}</div>
+          </div>
+          <div className="stat-item">
+            <div className="stat-label">上次结果</div>
+            <div className="stat-value">
+              {word.schedule?.lastResult ? RESULT_LABELS[word.schedule.lastResult] || word.schedule.lastResult : "无"}
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div style={{ height: 16 }} />
+      <div className="page-block" />
 
+      {/* Sources */}
       <div className="card stack">
         <h2 className="section-title">来源记录</h2>
         {word.sources.length === 0 ? (
@@ -81,7 +205,7 @@ export default async function WordDetailPage({ params }: { params: Promise<{ id:
               <div key={source.id} className="list-card">
                 <strong>来源：{SOURCE_LABELS[source.sourceType] || source.sourceType}</strong>
                 <span className="muted">{source.sourceNote || "无备注"}</span>
-                {source.sourceContext ? <span className="muted">{source.sourceContext}</span> : null}
+                {source.sourceContext && <span className="muted">{source.sourceContext}</span>}
                 <span className="muted">记录时间：{new Date(source.createdAt).toLocaleString()}</span>
               </div>
             ))}
@@ -89,8 +213,9 @@ export default async function WordDetailPage({ params }: { params: Promise<{ id:
         )}
       </div>
 
-      <div style={{ height: 16 }} />
+      <div className="page-block" />
 
+      {/* Review History */}
       <div className="card stack">
         <h2 className="section-title">最近复习记录</h2>
         {word.reviews.length === 0 ? (
@@ -100,8 +225,7 @@ export default async function WordDetailPage({ params }: { params: Promise<{ id:
             {word.reviews.map((review) => (
               <div key={review.id} className="list-card">
                 <strong>
-                  结果：
-                  <span className={`result-chip ${review.reviewResult}`}>{RESULT_LABELS[review.reviewResult] || review.reviewResult}</span>
+                  结果：<span className={`result-chip ${review.reviewResult}`}>{RESULT_LABELS[review.reviewResult] || review.reviewResult}</span>
                 </strong>
                 <span className="muted">时间：{new Date(review.reviewedAt).toLocaleString()}</span>
                 <span className="muted">间隔变化：{review.intervalBefore ?? 0} 天 → {review.intervalAfter ?? 0} 天</span>

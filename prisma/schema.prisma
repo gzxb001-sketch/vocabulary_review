@@ -42,9 +42,27 @@ model Word {
   sources         WordSource[]
   reviews         Review[]
   schedule        ReviewSchedule?
+  meanings        Meaning[]
 
   @@index([lemma])
   @@index([displayText])
+}
+
+model Meaning {
+  id                  String   @id @default(cuid())
+  wordId              String
+  partOfSpeech        String
+  meaningZh           String
+  exampleSentence     String?
+  exampleTranslation  String?
+  isObscure           Boolean  @default(false)
+  isHighFreq          Boolean  @default(false)
+  sortOrder           Int      @default(0)
+  createdAt           DateTime @default(now())
+
+  word                Word     @relation(fields: [wordId], references: [id], onDelete: Cascade)
+
+  @@index([wordId])
 }
 
 model WordSource {

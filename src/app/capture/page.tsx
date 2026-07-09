@@ -63,12 +63,15 @@ export default function CapturePage() {
         <h1 className="title">拍照录词</h1>
         <p className="subtitle">上传你的手写或印刷生词图片，系统自动提取候选词条。</p>
 
-        <div className="file-input-wrapper">
+        <div className="file-upload">
           <input
             type="file"
             accept="image/*"
             onChange={(e) => setFile(e.target.files?.[0] || null)}
           />
+          <p style={{ textAlign: "center", marginTop: "var(--space-2)", color: "var(--color-text-muted)", fontSize: "var(--text-sm)" }}>
+            点击选择图片或拖放到此处
+          </p>
         </div>
 
         {file ? (
