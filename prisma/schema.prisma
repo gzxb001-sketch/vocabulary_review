@@ -1,0 +1,101 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum SourceType {
+  exam
+  reading
+  lecture
+  manual
+  other
+}
+
+enum WordStatus {
+  active
+  archived
+}
+
+enum ReviewResult {
+  known
+  vague
+  forgot
+}
+
+model Word {
+  id              String          @id @default(cuid())
+  lemma           String
+  displayText     String
+  meaningZh       String?
+  phonetic        String?
+  partOfSpeech    String?
+  exampleSentence String?
+  note            String?
+  status          WordStatus      @default(active)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  sources         WordSource[]
+  reviews         Review[]
+  schedule        ReviewSchedule?
+
+  @@index([lemma])
+  @@index([displayText])
+}
+
+model WordSource {
+  id            String     @id @default(cuid())
+  wordId        String
+  sourceType    SourceType
+  sourceNote    String?
+  sourceContext String?
+  imageId       String?
+  createdAt     DateTime   @default(now())
+
+  word          Word       @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  image         Image?     @relation(fields: [imageId], references: [id], onDelete: SetNull)
+
+  @@index([wordId])
+  @@index([sourceType])
+  @@index([imageId])
+}
+
+model Image {
+  id         String       @id @default(cuid())
+  filePath   String
+  ocrRawText String?
+  createdAt  DateTime     @default(now())
+
+  sources    WordSource[]
+}
+
+model ReviewSchedule {
+  wordId        String        @id
+  nextReviewAt  DateTime
+  intervalDays  Int           @default(0)
+  easeScore     Float         @default(2.5)
+  reviewCount   Int           @default(0)
+  lastResult    ReviewResult?
+  updatedAt     DateTime      @updatedAt
+
+  word          Word          @relation(fields: [wordId], references: [id], onDelete: Cascade)
+
+  @@index([nextReviewAt])
+}
+
+model Review {
+  id             String       @id @default(cuid())
+  wordId         String
+  reviewResult   ReviewResult
+  reviewedAt     DateTime     @default(now())
+  intervalBefore Int?
+  intervalAfter  Int?
+
+  word           Word         @relation(fields: [wordId], references: [id], onDelete: Cascade)
+
+  @@index([wordId, reviewedAt])
+}
