@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import WordActions from "./word-actions";
 
+export const dynamic = "force-dynamic";
+
 const SOURCE_LABELS: Record<string, string> = {
   exam: "真题",
   reading: "阅读",
