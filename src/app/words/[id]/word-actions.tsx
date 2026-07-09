@@ -41,18 +41,8 @@ export default function WordActions(props: WordActionsProps) {
     try {
       const res = await fetch(`/api/words/${props.id}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          displayText,
-          lemma,
-          meaningZh,
-          phonetic,
-          partOfSpeech,
-          exampleSentence,
-          note,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ displayText, lemma, meaningZh, phonetic, partOfSpeech, exampleSentence, note }),
       });
 
       if (!res.ok) {
@@ -69,18 +59,13 @@ export default function WordActions(props: WordActionsProps) {
 
   async function handleDelete() {
     const confirmed = window.confirm("确定删除这个词条吗？删除后相关来源和复习记录也会一起删除。");
-
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
     setError("");
     setDeleting(true);
 
     try {
-      const res = await fetch(`/api/words/${props.id}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(`/api/words/${props.id}`, { method: "DELETE" });
 
       if (!res.ok) {
         setError("删除失败，请稍后重试");
@@ -99,10 +84,8 @@ export default function WordActions(props: WordActionsProps) {
       <h2 className="section-title">编辑词条</h2>
 
       {!editing ? (
-        <div className="action-row">
-          <button className="button" onClick={() => setEditing(true)}>
-            编辑
-          </button>
+        <div className="action-row-inline" style={{ display: "grid", gap: "10px", gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+          <button className="button button-secondary" onClick={() => setEditing(true)}>编辑</button>
           <button className="button button-danger" onClick={handleDelete} disabled={deleting}>
             {deleting ? "删除中..." : "删除"}
           </button>
@@ -111,54 +94,28 @@ export default function WordActions(props: WordActionsProps) {
         <div className="stack">
           <div>
             <label className="label">单词或短语</label>
-            <input
-              className="input"
-              value={displayText}
-              onChange={(e) => setDisplayText(e.target.value)}
-            />
+            <input className="input" value={displayText} onChange={(e) => setDisplayText(e.target.value)} />
           </div>
-
           <div>
             <label className="label">Lemma</label>
             <input className="input" value={lemma} onChange={(e) => setLemma(e.target.value)} />
           </div>
-
           <div>
             <label className="label">中文义</label>
-            <input
-              className="input"
-              value={meaningZh}
-              onChange={(e) => setMeaningZh(e.target.value)}
-            />
+            <input className="input" value={meaningZh} onChange={(e) => setMeaningZh(e.target.value)} />
           </div>
-
           <div>
             <label className="label">音标</label>
-            <input
-              className="input"
-              value={phonetic}
-              onChange={(e) => setPhonetic(e.target.value)}
-            />
+            <input className="input" value={phonetic} onChange={(e) => setPhonetic(e.target.value)} />
           </div>
-
           <div>
             <label className="label">词性</label>
-            <input
-              className="input"
-              value={partOfSpeech}
-              onChange={(e) => setPartOfSpeech(e.target.value)}
-            />
+            <input className="input" value={partOfSpeech} onChange={(e) => setPartOfSpeech(e.target.value)} />
           </div>
-
           <div>
             <label className="label">例句</label>
-            <textarea
-              className="textarea"
-              value={exampleSentence}
-              onChange={(e) => setExampleSentence(e.target.value)}
-            />
+            <textarea className="textarea" value={exampleSentence} onChange={(e) => setExampleSentence(e.target.value)} />
           </div>
-
           <div>
             <label className="label">备注</label>
             <textarea className="textarea" value={note} onChange={(e) => setNote(e.target.value)} />
@@ -166,19 +123,9 @@ export default function WordActions(props: WordActionsProps) {
 
           {error ? <p className="muted">{error}</p> : null}
 
-          <div className="action-row">
-            <button className="button" onClick={handleSave} disabled={saving}>
-              {saving ? "保存中..." : "保存修改"}
-            </button>
-            <button
-              className="button button-secondary"
-              onClick={() => {
-                setEditing(false);
-                setError("");
-              }}
-            >
-              取消
-            </button>
+          <div className="action-row-inline" style={{ display: "grid", gap: "10px", gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+            <button className="button" onClick={handleSave} disabled={saving}>{saving ? "保存中..." : "保存修改"}</button>
+            <button className="button button-secondary" onClick={() => { setEditing(false); setError(""); }}>取消</button>
           </div>
         </div>
       )}

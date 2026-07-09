@@ -19,60 +19,28 @@ async function getHomeData() {
   ] = await Promise.all([
     prisma.word.count(),
     prisma.reviewSchedule.count({
-      where: {
-        nextReviewAt: {
-          lte: now,
-        },
-      },
+      where: { nextReviewAt: { lte: now } },
     }),
     prisma.word.count({
-      where: {
-        createdAt: {
-          gte: startOfToday,
-        },
-      },
+      where: { createdAt: { gte: startOfToday } },
     }),
     prisma.review.count({
-      where: {
-        reviewedAt: {
-          gte: startOfToday,
-          lt: endOfToday,
-        },
-      },
+      where: { reviewedAt: { gte: startOfToday, lt: endOfToday } },
     }),
     prisma.word.findMany({
-      orderBy: {
-        createdAt: "desc",
-      },
-      include: {
-        sources: {
-          orderBy: {
-            createdAt: "desc",
-          },
-          take: 1,
-        },
-      },
+      orderBy: { createdAt: "desc" },
+      include: { sources: { orderBy: { createdAt: "desc" }, take: 1 } },
       take: 5,
     }),
     prisma.review.findMany({
-      include: {
-        word: true,
-      },
-      orderBy: {
-        reviewedAt: "desc",
-      },
+      include: { word: true },
+      orderBy: { reviewedAt: "desc" },
       take: 5,
     }),
     prisma.wordSource.groupBy({
       by: ["sourceType"],
-      _count: {
-        sourceType: true,
-      },
-      orderBy: {
-        _count: {
-          sourceType: "desc",
-        },
-      },
+      _count: { sourceType: true },
+      orderBy: { _count: { sourceType: "desc" } },
     }),
   ]);
 
@@ -87,14 +55,22 @@ async function getHomeData() {
   };
 }
 
+const SOURCE_LABELS: Record<string, string> = {
+  exam: "真题",
+  reading: "阅读",
+  lecture: "听课",
+  manual: "手动",
+  other: "其他",
+};
+
 export default async function HomePage() {
   const data = await getHomeData();
 
   return (
-    <main className="container">
+    <main className="container fade-in">
       <div className="card stack">
-        <h1 className="title">今天复习 {data.dueCount} 个词</h1>
-        <p className="subtitle">现在已经能形成完整闭环：录词、保存、复习、导出，首页也会帮你看清今天该做什么。</p>
+        <h1 className="title">早安</h1>
+        <p className="subtitle">今天还有 {data.dueCount} 个词等你复习。</p>
 
         <div className="summary-grid">
           <div className="summary-card">
@@ -116,10 +92,9 @@ export default async function HomePage() {
         </div>
 
         <div className="dashboard-note">
-          <strong>今日建议：</strong>
           {data.dueCount > 0
             ? `先完成 ${data.dueCount} 个待复习词，再补录今天遇到的新词。`
-            : "今天没有到期词，可以趁现在补录新词或回顾最近新增。"}
+            : "今天没有到期词，趁现在录新词或回顾最近新增。"}
         </div>
 
         <div className="link-row">
@@ -147,12 +122,12 @@ export default async function HomePage() {
         <h2 className="section-title">来源分布</h2>
 
         {data.sourceDistribution.length === 0 ? (
-          <p className="muted">还没有来源数据，录词后这里会显示你主要从哪里积累生词。</p>
+          <p className="muted">录词后这里会显示你主要从哪里积累生词。</p>
         ) : (
           <div className="tag-grid">
             {data.sourceDistribution.map((item) => (
               <div key={item.sourceType} className="list-card">
-                <strong>{item.sourceType}</strong>
+                <strong>{SOURCE_LABELS[item.sourceType] || item.sourceType}</strong>
                 <span className="muted">{item._count.sourceType} 条</span>
               </div>
             ))}
@@ -174,7 +149,7 @@ export default async function HomePage() {
                 <strong>{word.displayText}</strong>
                 <div className="muted">{word.meaningZh || "暂无释义"}</div>
                 {word.sources[0]?.sourceType ? (
-                  <span className="muted">来源：{word.sources[0].sourceType}</span>
+                  <span className="muted">来源：{SOURCE_LABELS[word.sources[0].sourceType] || word.sources[0].sourceType}</span>
                 ) : null}
               </Link>
             ))
@@ -194,9 +169,11 @@ export default async function HomePage() {
             data.recentReviews.map((review) => (
               <div key={review.id} className="list-card">
                 <strong>{review.word.displayText}</strong>
-                <span className="muted">结果：{review.reviewResult}</span>
+                <span className={`result-chip ${review.reviewResult}`}>
+                  {review.reviewResult === "known" ? "认识" : review.reviewResult === "vague" ? "模糊" : "忘记"}
+                </span>
                 <span className="muted">
-                  时间：{new Date(review.reviewedAt).toLocaleString()}
+                  {new Date(review.reviewedAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}
                 </span>
               </div>
             ))

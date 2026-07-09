@@ -58,26 +58,28 @@ export default function CapturePage() {
   }
 
   return (
-    <main className="container">
+    <main className="container fade-in">
       <div className="card stack">
         <h1 className="title">拍照录词</h1>
-        <p className="subtitle">先上传图片，系统会提取候选词条。</p>
+        <p className="subtitle">上传你的手写或印刷生词图片，系统自动提取候选词条。</p>
 
-        <div>
-          <label className="label">选择图片</label>
+        <div className="file-input-wrapper">
           <input
-            className="input"
             type="file"
             accept="image/*"
             onChange={(e) => setFile(e.target.files?.[0] || null)}
           />
         </div>
 
-        <p className="muted">尽量平拍，避免阴影。第一版建议一次只拍几行词。</p>
+        {file ? (
+          <p className="muted">已选择：{file.name}</p>
+        ) : null}
+
+        <p className="muted">尽量平拍，避免阴影。建议一次只拍几行词。</p>
 
         {error ? <p className="muted">{error}</p> : null}
 
-        <button className="button" onClick={handleSubmit} disabled={loading}>
+        <button className="button" onClick={handleSubmit} disabled={loading || !file}>
           {loading ? "识别中..." : "开始识别"}
         </button>
       </div>

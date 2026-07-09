@@ -42,12 +42,8 @@ export default function ManualPage() {
     try {
       const res = await fetch("/api/words/enrich", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          items: [{ text: displayText.trim() }],
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: [{ text: displayText.trim() }] }),
       });
 
       if (!res.ok) {
@@ -90,9 +86,7 @@ export default function ManualPage() {
     try {
       const res = await fetch("/api/words/save", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           items: [
             {
@@ -102,10 +96,7 @@ export default function ManualPage() {
               phonetic: phonetic.trim(),
               partOfSpeech: partOfSpeech.trim(),
               exampleSentence: exampleSentence.trim(),
-              source: {
-                sourceType,
-                sourceNote: sourceNote.trim(),
-              },
+              source: { sourceType, sourceNote: sourceNote.trim() },
             },
           ],
         }),
@@ -124,10 +115,10 @@ export default function ManualPage() {
   }
 
   return (
-    <main className="container">
+    <main className="container fade-in">
       <div className="card stack">
         <h1 className="title">手动录词</h1>
-        <p className="subtitle">先输入最少信息，确保今天能开始复习。</p>
+        <p className="subtitle">输入单词或短语，系统会自动补全释义、音标和例句。</p>
 
         <div>
           <label className="label">单词或短语</label>
@@ -142,16 +133,6 @@ export default function ManualPage() {
         <button className="button button-secondary" onClick={handleEnrich} disabled={enriching}>
           {enriching ? "补全中..." : "自动补全"}
         </button>
-
-        <div>
-          <label className="label">Lemma</label>
-          <input
-            className="input"
-            placeholder="自动生成"
-            value={lemma}
-            onChange={(e) => setLemma(e.target.value)}
-          />
-        </div>
 
         <div>
           <label className="label">最短中文义</label>
@@ -195,11 +176,7 @@ export default function ManualPage() {
 
         <div>
           <label className="label">来源</label>
-          <select
-            className="select"
-            value={sourceType}
-            onChange={(e) => setSourceType(e.target.value as SourceType)}
-          >
+          <select className="select" value={sourceType} onChange={(e) => setSourceType(e.target.value as SourceType)}>
             <option value="manual">手动</option>
             <option value="exam">真题</option>
             <option value="reading">阅读</option>
