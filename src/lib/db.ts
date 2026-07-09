@@ -11,13 +11,12 @@ function createPrismaClient(): PrismaClient {
 
   // Turso / libsql (production)
   if (dbUrl.startsWith("libsql://")) {
-    const adapter = new PrismaLibSQL(
-      createClient({
-        url: dbUrl,
-        authToken: process.env.TURSO_AUTH_TOKEN,
-      })
-    );
-    return new PrismaClient({ adapter });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const adapter = new PrismaLibSQL(createClient({
+      url: dbUrl,
+      authToken: process.env.TURSO_AUTH_TOKEN,
+    }) as any);
+    return new PrismaClient({ adapter } as any);
   }
 
   // Local SQLite (development)

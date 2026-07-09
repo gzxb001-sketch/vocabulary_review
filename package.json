@@ -14,7 +14,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@libsql/client": "^0.17.4",
+    "@libsql/client": "^0.14.0",
     "@prisma/adapter-libsql": "^6.16.1",
     "@prisma/client": "^6.16.1",
     "next": "^16.2.10",
