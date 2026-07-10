@@ -18,16 +18,29 @@ function createTursoPrisma(): PrismaClient {
   return new PrismaClient({ adapter });
 }
 
+function createLocalPrisma(): PrismaClient {
+  return new PrismaClient({ log: ["error", "warn"] });
+}
+
 function createPrismaClient(): PrismaClient {
   const dbUrl = process.env.DATABASE_URL ?? "file:./dev.db";
   if (dbUrl.startsWith("libsql://")) {
     return createTursoPrisma();
   }
-  return new PrismaClient({ log: ["error", "warn"] });
+  return createLocalPrisma();
 }
 
-export const prisma = globalForPrisma.prisma ?? createPrismaClient();
+// Lazy init: deferred until first access, ensuring env vars are loaded
+let _prisma: PrismaClient | null = null;
 
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
-}
+export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
+  get(_, prop) {
+    if (!_prisma) {
+      _prisma = createPrismaClient();
+      if (process.env.NODE_ENV !== "production") {
+        globalForPrisma.prisma = _prisma;
+      }
+    }
+    return (_prisma as any)[prop];
+  },
+});
