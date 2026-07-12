@@ -46,13 +46,14 @@ export async function POST(req: NextRequest) {
 
       if (!normalizedDisplayText) continue;
 
-      let existingWord = normalizedLemma
-        ? await prisma.word.findFirst({ where: { lemma: normalizedLemma } })
-        : null;
-
-      if (!existingWord) {
-        existingWord = await prisma.word.findFirst({ where: { displayText: normalizedDisplayText } });
-      }
+      const existingWord = await prisma.word.findFirst({
+        where: {
+          OR: [
+            ...(normalizedLemma ? [{ lemma: normalizedLemma }] : []),
+            { displayText: normalizedDisplayText },
+          ],
+        },
+      });
 
       if (existingWord) {
         duplicates += 1;
@@ -69,28 +70,35 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        // Add new meanings if provided and not already present
+        // Add new meanings if provided
         if (item.meanings?.length) {
           const existingMeanings = await prisma.meaning.findMany({
             where: { wordId: existingWord.id },
             select: { meaningZh: true, partOfSpeech: true },
           });
 
-          const existingSet = new Set(existingMeanings.map((m) => `${m.partOfSpeech}::${m.meaningZh}`));
+          const existingSet = new Set(
+            existingMeanings.map((m) => `${m.partOfSpeech}::${m.meaningZh}`)
+          );
 
           const newMeanings = item.meanings
-            .filter((m) => !existingSet.has(`${m.partOfSpeech}::${m.meaningZh}`))
+            .filter((m) => m.meaningZh && !existingSet.has(`${m.partOfSpeech}::${m.meaningZh}`))
             .map((m, i) => ({
-              wordId: existingWord!.id,
-              partOfSpeech: m.partOfSpeech,
+              wordId: existingWord.id,
+              partOfSpeech: m.partOfSpeech || "",
               meaningZh: m.meaningZh,
               exampleSentence: m.exampleSentence || null,
+              exampleTranslation: m.exampleTranslation || null,
               isObscure: m.isObscure || false,
+              isHighFreq: m.isHighFreq || false,
               sortOrder: existingMeanings.length + i,
             }));
 
           if (newMeanings.length > 0) {
-            await prisma.meaning.createMany({ data: newMeanings });
+            // Use individual create instead of createMany for Turso compatibility
+            for (const m of newMeanings) {
+              await prisma.meaning.create({ data: m });
+            }
           }
         }
 
@@ -107,33 +115,12 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      // Create new word
+      // --- Create new word (sequential writes, no nested creates for Turso compat) ---
+
       const schedule = createInitialSchedule();
 
-      const meaningsData = (item.meanings || []).map((m, i) => ({
-        partOfSpeech: m.partOfSpeech,
-        meaningZh: m.meaningZh,
-        exampleSentence: m.exampleSentence || null,
-        exampleTranslation: m.exampleTranslation || null,
-        isObscure: m.isObscure || false,
-        isHighFreq: m.isHighFreq || false,
-        sortOrder: i,
-      }));
-
-      // Also create a fallback meaning from top-level fields if no meanings provided
-      if (meaningsData.length === 0 && (item.partOfSpeech || item.meaningZh)) {
-        meaningsData.push({
-          partOfSpeech: item.partOfSpeech || "",
-          meaningZh: item.meaningZh || "",
-          exampleSentence: item.exampleSentence || null,
-          exampleTranslation: null,
-          isObscure: false,
-          isHighFreq: false,
-          sortOrder: 0,
-        });
-      }
-
-      await prisma.word.create({
+      // Step 1: Create the word
+      const newWord = await prisma.word.create({
         data: {
           lemma: normalizedLemma || normalizedDisplayText.toLowerCase(),
           displayText: normalizedDisplayText,
@@ -142,26 +129,55 @@ export async function POST(req: NextRequest) {
           partOfSpeech: item.partOfSpeech,
           exampleSentence: item.exampleSentence,
           note: item.note,
-          sources: {
-            create: {
-              sourceType: item.source.sourceType,
-              sourceNote: item.source.sourceNote,
-              sourceContext: item.source.sourceContext,
-              imageId: item.source.imageId,
-            },
-          },
-          schedule: {
-            create: {
-              nextReviewAt: schedule.nextReviewAt,
-              intervalDays: schedule.intervalDays,
-              reviewCount: schedule.reviewCount,
-              easeScore: schedule.easeScore,
-              lastResult: schedule.lastResult,
-            },
-          },
-          meanings: meaningsData.length > 0 ? { createMany: { data: meaningsData } } : undefined,
         },
       });
+
+      // Step 2: Create review schedule
+      await prisma.reviewSchedule.create({
+        data: {
+          wordId: newWord.id,
+          nextReviewAt: schedule.nextReviewAt,
+          intervalDays: schedule.intervalDays,
+          reviewCount: schedule.reviewCount,
+          easeScore: schedule.easeScore,
+          lastResult: schedule.lastResult,
+        },
+      });
+
+      // Step 3: Create word source
+      await prisma.wordSource.create({
+        data: {
+          wordId: newWord.id,
+          sourceType: item.source.sourceType,
+          sourceNote: item.source.sourceNote,
+          sourceContext: item.source.sourceContext,
+          imageId: item.source.imageId,
+        },
+      });
+
+      // Step 4: Create meanings
+      const meaningsToCreate = ((item.meanings || []).length > 0
+        ? item.meanings!
+        : item.partOfSpeech || item.meaningZh
+          ? [{ partOfSpeech: item.partOfSpeech || "", meaningZh: item.meaningZh || "" }]
+          : []
+      ).filter((m) => m.meaningZh); // skip empty meanings
+
+      for (let i = 0; i < meaningsToCreate.length; i++) {
+        const m = meaningsToCreate[i];
+        await prisma.meaning.create({
+          data: {
+            wordId: newWord.id,
+            partOfSpeech: m.partOfSpeech || "",
+            meaningZh: m.meaningZh,
+            exampleSentence: m.exampleSentence || null,
+            exampleTranslation: m.exampleTranslation || null,
+            isObscure: m.isObscure || false,
+            isHighFreq: m.isHighFreq || false,
+            sortOrder: i,
+          },
+        });
+      }
 
       saved += 1;
     }
@@ -171,10 +187,7 @@ export async function POST(req: NextRequest) {
     const msg = error?.message || String(error);
     console.error("save words failed:", msg);
     return NextResponse.json(
-      {
-        message: "保存失败",
-        detail: process.env.NODE_ENV === "development" ? msg : undefined,
-      },
+      { message: "保存失败", detail: msg },
       { status: 500 }
     );
   }
