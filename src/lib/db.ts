@@ -1,37 +1,37 @@
 import { PrismaClient } from "@prisma/client";
 
-// 使用 globalThis 缓存实例，防止 Vercel serverless 热启动时重复创建连接
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
-};
+// 全局单例缓存
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
+
+function getEnvOrThrow(key: string): string {
+  const value = process.env[key];
+  if (!value || value === "undefined") {
+    throw new Error(
+      `环境变量 ${key} 未设置。请在 Vercel 项目 Settings → Environment Variables 中添加 ${key}，然后 Redeploy。`
+    );
+  }
+  return value;
+}
 
 function createPrismaClient(): PrismaClient {
-  const dbUrl = process.env.DATABASE_URL;
+  const dbUrl = getEnvOrThrow("DATABASE_URL");
 
-  if (!dbUrl) {
-    throw new Error("DATABASE_URL 环境变量未设置");
-  }
-
-  // Turso / libsql 远程数据库（生产环境）
+  // Turso / libsql 远程数据库
   if (dbUrl.startsWith("libsql://")) {
-    const authToken = process.env.TURSO_AUTH_TOKEN;
-    if (!authToken) {
-      throw new Error("TURSO_AUTH_TOKEN 环境变量未设置");
-    }
+    const authToken = getEnvOrThrow("TURSO_AUTH_TOKEN");
 
+    // 使用 require 延迟加载（已通过 serverExternalPackages 标记为外部包）
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { PrismaLibSQL } = require("@prisma/adapter-libsql");
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { createClient } = require("@libsql/client/http");
 
-    const adapter = new PrismaLibSQL(
-      createClient({
-        url: dbUrl,
-        authToken,
-      })
-    );
+    const libsqlClient = createClient({ url: dbUrl, authToken });
+    const adapter = new PrismaLibSQL(libsqlClient);
     return new PrismaClient({ adapter });
   }
 
-  // 本地 SQLite（开发环境）
+  // 本地 SQLite
   return new PrismaClient({ log: ["error", "warn"] });
 }
 
@@ -42,8 +42,7 @@ function getPrismaClient(): PrismaClient {
   return globalForPrisma.prisma;
 }
 
-// 导出惰性代理，导入模块时不会立即初始化连接
-// 只有实际调用 prisma.xxx.xxx() 时才会触发初始化
+// 惰性 Proxy：导入模块时不初始化，首次调用 prisma.xxx 时才触发
 export const prisma = new Proxy({} as PrismaClient, {
   get(_, prop: string | symbol) {
     const client = getPrismaClient();
