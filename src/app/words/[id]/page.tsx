@@ -19,15 +19,20 @@ const RESULT_LABELS: Record<string, string> = {
 };
 
 async function getWordDetail(id: string) {
-  return prisma.word.findUnique({
-    where: { id },
-    include: {
-      sources: { orderBy: { createdAt: "desc" } },
-      reviews: { orderBy: { reviewedAt: "desc" }, take: 10 },
-      schedule: true,
-      meanings: { orderBy: { sortOrder: "asc" } },
-    },
-  });
+  try {
+    return await prisma.word.findUnique({
+      where: { id },
+      include: {
+        sources: { orderBy: { createdAt: "desc" } },
+        reviews: { orderBy: { reviewedAt: "desc" }, take: 10 },
+        schedule: true,
+        meanings: { orderBy: { sortOrder: "asc" } },
+      },
+    });
+  } catch (error) {
+    console.error("word detail fetch failed:", error);
+    return null;
+  }
 }
 
 export default async function WordDetailPage({

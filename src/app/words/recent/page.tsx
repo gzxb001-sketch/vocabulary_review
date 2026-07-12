@@ -4,14 +4,18 @@ import { prisma } from "@/lib/db";
 export const dynamic = "force-dynamic";
 
 async function getRecentWords() {
-  const words = await prisma.word.findMany({
-    orderBy: { createdAt: "desc" },
-    include: {
-      meanings: { orderBy: { sortOrder: "asc" }, take: 3 },
-      sources: { orderBy: { createdAt: "desc" }, take: 1 },
-    },
-  });
-  return words;
+  try {
+    return await prisma.word.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        meanings: { orderBy: { sortOrder: "asc" }, take: 3 },
+        sources: { orderBy: { createdAt: "desc" }, take: 1 },
+      },
+    });
+  } catch (error) {
+    console.error("recent words fetch failed:", error);
+    return [];
+  }
 }
 
 const SOURCE_LABELS: Record<string, string> = {

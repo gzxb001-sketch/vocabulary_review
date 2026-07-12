@@ -4,57 +4,70 @@ import { prisma } from "@/lib/db";
 export const dynamic = "force-dynamic";
 
 async function getHomeData() {
-  const now = new Date();
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  const endOfToday = new Date(startOfToday);
-  endOfToday.setDate(endOfToday.getDate() + 1);
+  try {
+    const now = new Date();
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date(startOfToday);
+    endOfToday.setDate(endOfToday.getDate() + 1);
 
-  const [
-    totalWordsCount,
-    dueCount,
-    todayAddedCount,
-    todayReviewedCount,
-    recentWords,
-    recentReviews,
-    sourceDistribution,
-  ] = await Promise.all([
-    prisma.word.count(),
-    prisma.reviewSchedule.count({
-      where: { nextReviewAt: { lte: now } },
-    }),
-    prisma.word.count({
-      where: { createdAt: { gte: startOfToday } },
-    }),
-    prisma.review.count({
-      where: { reviewedAt: { gte: startOfToday, lt: endOfToday } },
-    }),
-    prisma.word.findMany({
-      orderBy: { createdAt: "desc" },
-      include: { sources: { orderBy: { createdAt: "desc" }, take: 1 } },
-      take: 15,
-    }),
-    prisma.review.findMany({
-      include: { word: true },
-      orderBy: { reviewedAt: "desc" },
-      take: 15,
-    }),
-    prisma.wordSource.groupBy({
-      by: ["sourceType"],
-      _count: { sourceType: true },
-      orderBy: { _count: { sourceType: "desc" } },
-    }),
-  ]);
+    const [
+      totalWordsCount,
+      dueCount,
+      todayAddedCount,
+      todayReviewedCount,
+      recentWords,
+      recentReviews,
+      sourceDistribution,
+    ] = await Promise.all([
+      prisma.word.count(),
+      prisma.reviewSchedule.count({
+        where: { nextReviewAt: { lte: now } },
+      }),
+      prisma.word.count({
+        where: { createdAt: { gte: startOfToday } },
+      }),
+      prisma.review.count({
+        where: { reviewedAt: { gte: startOfToday, lt: endOfToday } },
+      }),
+      prisma.word.findMany({
+        orderBy: { createdAt: "desc" },
+        include: { sources: { orderBy: { createdAt: "desc" }, take: 1 } },
+        take: 15,
+      }),
+      prisma.review.findMany({
+        include: { word: true },
+        orderBy: { reviewedAt: "desc" },
+        take: 15,
+      }),
+      prisma.wordSource.groupBy({
+        by: ["sourceType"],
+        _count: { sourceType: true },
+        orderBy: { _count: { sourceType: "desc" } },
+      }),
+    ]);
 
-  return {
-    totalWordsCount,
-    dueCount,
-    todayAddedCount,
-    todayReviewedCount,
-    recentWords,
-    recentReviews,
-    sourceDistribution,
-  };
+    return {
+      totalWordsCount,
+      dueCount,
+      todayAddedCount,
+      todayReviewedCount,
+      recentWords,
+      recentReviews,
+      sourceDistribution,
+    };
+  } catch (error) {
+    console.error("homepage data fetch failed:", error);
+    return {
+      totalWordsCount: 0,
+      dueCount: 0,
+      todayAddedCount: 0,
+      todayReviewedCount: 0,
+      recentWords: [],
+      recentReviews: [],
+      sourceDistribution: [],
+    };
+  }
 }
 
 const SOURCE_LABELS: Record<string, string> = {
