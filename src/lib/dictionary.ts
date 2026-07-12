@@ -2,6 +2,23 @@ import { normalizeLemma, normalizeText } from "@/lib/normalize";
 import { KAOYAN_WORD_MAP, MeaningEntry, getKaoyanEntry } from "@/lib/kaoyan-words";
 import { COMMON_DICT, CommonDictEntry } from "@/lib/common-dict";
 
+/* ---- 带超时的 fetch 封装（Vercel serverless 有 10s 限制） ---- */
+
+async function fetchWithTimeout(url: string, timeoutMs = 8000): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      method: "GET",
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    return res;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export type EnrichedMeaning = {
   partOfSpeech: string;
   meaningZh: string;
@@ -97,7 +114,7 @@ async function translate(text: string): Promise<string> {
   const cached = transCache.get(n);
   if (cached !== undefined) return cached;
   try {
-    const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(n)}&langpair=en|zh-CN`, { method: "GET", cache: "no-store" });
+    const res = await fetchWithTimeout(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(n)}&langpair=en|zh-CN`);
     if (!res.ok) { transCache.set(n, ""); return ""; }
     const data = (await res.json()) as TransRes;
     const t = cleanTrans(data.responseData?.translatedText || "");
@@ -247,7 +264,7 @@ async function queryFD(text: string): Promise<EnrichedWord | null> {
   if (l.includes(" ")) return null;
 
   try {
-    const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(l)}`, { method: "GET", cache: "no-store" });
+    const res = await fetchWithTimeout(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(l)}`);
     if (!res.ok) return null;
     const data = (await res.json()) as FDEntry[];
     const entry = data?.[0];
