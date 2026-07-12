@@ -86,7 +86,11 @@ export default function ManualPage() {
           }],
         }),
       });
-      if (!res.ok) { setError("保存失败，请稍后重试"); return; }
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.detail || data.message || "保存失败，请稍后重试");
+        return;
+      }
       router.push("/"); router.refresh();
     } finally { setSaving(false); }
   }

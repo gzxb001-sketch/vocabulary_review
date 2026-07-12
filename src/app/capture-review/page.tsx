@@ -69,7 +69,11 @@ export default function CaptureReviewPage() {
         body: JSON.stringify({ items: saveItems }),
       });
 
-      if (!saveRes.ok) { setError("保存失败"); return; }
+      if (!saveRes.ok) {
+        const data = await saveRes.json().catch(() => ({}));
+        setError(data.detail || data.message || "保存失败");
+        return;
+      }
 
       clear();
       router.push("/");

@@ -167,8 +167,15 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ saved, duplicates });
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json({ message: "save failed" }, { status: 500 });
+  } catch (error: any) {
+    const msg = error?.message || String(error);
+    console.error("save words failed:", msg);
+    return NextResponse.json(
+      {
+        message: "保存失败",
+        detail: process.env.NODE_ENV === "development" ? msg : undefined,
+      },
+      { status: 500 }
+    );
   }
 }
