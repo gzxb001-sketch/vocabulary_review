@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -15,11 +15,12 @@ type EnrichItem = {
 
 export default function CaptureReviewPage() {
   const router = useRouter();
-  const { items, updateItem, removeItem, clear } = useDraftWordStore();
+  const { items, updateItem, removeItem, clear, addItems } = useDraftWordStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [bulkSourceType, setBulkSourceType] = useState<"exam" | "reading" | "lecture" | "manual" | "other">("exam");
   const [bulkSourceNote, setBulkSourceNote] = useState("");
+  const [manualInput, setManualInput] = useState("");
 
   function setAllSelected(selected: boolean) {
     items.forEach((item) => { updateItem(item.tempId, { selected }); });
@@ -29,6 +30,30 @@ export default function CaptureReviewPage() {
     items.filter((item) => item.selected).forEach((item) => {
       updateItem(item.tempId, { sourceType: bulkSourceType, sourceNote: bulkSourceNote });
     });
+  }
+
+  function handleAddManual() {
+    const words = manualInput
+      .split(/[\n,,\uFF0C]+/)
+      .map((w) => w.trim())
+      .filter((w) => w.length >= 2 && /^[A-Za-z]+$/.test(w));
+
+    if (words.length === 0) {
+      setError("请输入至少一个英文单词，每行一个或用逗号分隔");
+      return;
+    }
+
+    setError("");
+    const now = Date.now();
+    const newItems = words.map((text, i) => ({
+      tempId: "man_" + now + "_" + i,
+      text,
+      selected: true,
+      sourceType: bulkSourceType,
+      sourceNote: bulkSourceNote,
+    }));
+    addItems(newItems);
+    setManualInput("");
   }
 
   async function handleEnrichAndSave() {
@@ -59,7 +84,7 @@ export default function CaptureReviewPage() {
           phonetic: enriched?.phonetic || "",
           partOfSpeech: enriched?.partOfSpeech || "",
           exampleSentence: enriched?.exampleSentence || "",
-          source: { sourceType: item.sourceType, sourceNote: item.sourceNote || "", imageId: item.imageId },
+          source: { sourceType: item.sourceType, sourceNote: item.sourceNote || "" },
         };
       });
 
@@ -87,11 +112,11 @@ export default function CaptureReviewPage() {
     <main className="container fade-in">
       <div className="card stack">
         <h1 className="title">确认识别结果</h1>
-        <p className="subtitle">删除无效项，修改后再加入词库。</p>
+        <p className="subtitle">
+          OCR 识别结果如下。识别不准时，可在下方手动输入单词补充。
+        </p>
 
-        {items.length === 0 ? (
-          <p className="muted">当前没有候选词，请先返回上传图片。</p>
-        ) : (
+        {items.length > 0 && (
           <div className="stack">
             <div className="card">
               <h2 className="section-title">批量操作</h2>
@@ -141,10 +166,40 @@ export default function CaptureReviewPage() {
           </div>
         )}
 
-        {error ? <p className="muted">{error}</p> : null}
+        <div className="card">
+          <h2 className="section-title">手动添加单词</h2>
+          <textarea
+            className="input"
+            rows={3}
+            placeholder={"输入英文单词，每行一个或用逗号分隔。例如：\nabandon\nderive\ncompulsory"}
+            value={manualInput}
+            onChange={(e) => { setManualInput(e.target.value); setError(""); }}
+            style={{ resize: "vertical", minHeight: 80 }}
+          />
+          <button
+            className="button button-secondary"
+            onClick={handleAddManual}
+            disabled={!manualInput.trim()}
+            style={{ marginTop: "var(--space-2)" }}
+          >
+            添加到列表
+          </button>
+        </div>
 
-        <button className="button" onClick={handleEnrichAndSave} disabled={loading}>
+        {items.length === 0 && (
+          <div className="card empty-state">
+            <p className="muted">当前没有候选词。请拍照识别或在上方手动输入单词。</p>
+          </div>
+        )}
+
+        {error ? <p className="muted" style={{ color: "#dc2626" }}>{error}</p> : null}
+
+        <button className="button" onClick={handleEnrichAndSave} disabled={loading || items.length === 0}>
           {loading ? "处理中..." : "自动补全并保存"}
+        </button>
+
+        <button className="button button-secondary" onClick={() => router.push("/capture")}>
+          返回拍照
         </button>
       </div>
     </main>

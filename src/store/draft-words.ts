@@ -1,4 +1,4 @@
-import { create } from "zustand";
+﻿import { create } from "zustand";
 
 export type DraftWord = {
   tempId: string;
@@ -17,6 +17,7 @@ export type DraftWord = {
 type DraftWordStore = {
   items: DraftWord[];
   setItems: (items: DraftWord[]) => void;
+  addItems: (items: DraftWord[]) => void;
   updateItem: (tempId: string, patch: Partial<DraftWord>) => void;
   removeItem: (tempId: string) => void;
   clear: () => void;
@@ -25,6 +26,7 @@ type DraftWordStore = {
 export const useDraftWordStore = create<DraftWordStore>((set) => ({
   items: [],
   setItems: (items) => set({ items }),
+  addItems: (newItems) => set((state) => ({ items: [...state.items, ...newItems] })),
   updateItem: (tempId, patch) =>
     set((state) => ({
       items: state.items.map((item) =>
