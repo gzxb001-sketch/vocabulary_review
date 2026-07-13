@@ -4,7 +4,7 @@ import { COMMON_DICT, CommonDictEntry } from "@/lib/common-dict";
 
 /* ---- 带超时的 fetch 封装（Vercel serverless 有 10s 限制） ---- */
 
-async function fetchWithTimeout(url: string, timeoutMs = 8000): Promise<Response> {
+async function fetchWithTimeout(url: string, timeoutMs = 4000): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -311,5 +311,5 @@ export async function enrichWord(text: string): Promise<EnrichedWord> {
 
 export async function enrichWords(texts: string[]): Promise<EnrichedWord[]> {
   const unique = Array.from(new Set(texts.map((t) => normalizeText(t)).filter(Boolean)));
-  return Promise.all(unique.map((t) => enrichWord(t)));
+  return Promise.all(unique.map((t) => enrichWord(t).catch(() => buildFallback(t))));
 }
