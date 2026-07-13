@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { createWorker } from "tesseract.js";
@@ -12,8 +12,8 @@ function cleanOcrText(rawText: string): string[] {
     .map((line) =>
       line
         .replace(/[|]/g, " ")
-        .replace(/[\""\""\""']/g, "")
-        .replace(/[，。；：？！,.;:!?()[\]{}<>]/g, " ")
+        .replace(/[\\\""\\\""\\\""\x60]/g, "")
+        .replace(/[\uFF0C\u3002\uFF1B\uFF1A\uFF1F\uFF01,.;:!?()[\]{}<>]/g, " ")
         .replace(/\d+/g, " ")
         .replace(/\s+/g, " ")
         .trim()
@@ -109,23 +109,33 @@ export default function CapturePage() {
           </div>
         )}
 
-        <div className="file-upload">
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={handleFileChange}
-          />
-          <p style={{ textAlign: "center", marginTop: "var(--space-2)", color: "var(--color-text-muted)", fontSize: "var(--text-sm)" }}>
-            点击拍照或从相册选择
-          </p>
+        <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "center" }}>
+          <label className="button button-secondary" style={{ cursor: "pointer", flex: 1, textAlign: "center" }}>
+            拍照
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleFileChange}
+              style={{ display: "none" }}
+            />
+          </label>
+          <label className="button button-secondary" style={{ cursor: "pointer", flex: 1, textAlign: "center" }}>
+            相册选择
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              style={{ display: "none" }}
+            />
+          </label>
         </div>
 
         {file ? <p className="muted">已选择：{file.name}</p> : null}
 
         <p className="muted">尽量平拍，确保英文文字清晰可见。</p>
 
-        {error ? <p className="muted" style={{ color: "var(--color-error, #dc2626)" }}>{error}</p> : null}
+        {error ? <p className="muted" style={{ color: "#dc2626" }}>{error}</p> : null}
         {loading && progress ? <p className="muted">{progress}</p> : null}
 
         <button className="button" onClick={handleOcr} disabled={loading || !file}>
