@@ -1,45 +1,24 @@
-import { PrismaClient } from "@prisma/client";
-import { PrismaLibSQL } from "@prisma/adapter-libsql";
-import { createClient } from "@libsql/client/http";
+﻿import { PrismaClient } from '@prisma/client';
+import { PrismaLibSQL } from '@prisma/adapter-libsql';
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
 
 function createPrismaClient(): PrismaClient {
   const dbUrl = process.env.DATABASE_URL;
-
-  if (!dbUrl || dbUrl === "undefined") {
-    throw new Error("DATABASE_URL 环境变量未设置");
+  if (!dbUrl || dbUrl === 'undefined') throw new Error('DATABASE_URL not set');
+  if (dbUrl.startsWith('libsql://')) {
+    const token = process.env.TURSO_AUTH_TOKEN;
+    if (!token || token === 'undefined') throw new Error('TURSO_AUTH_TOKEN not set');
+    return new PrismaClient({ adapter: new PrismaLibSQL({ url: dbUrl, authToken: token }) });
   }
-
-  // Turso / libsql 远程数据库
-  if (dbUrl.startsWith("libsql://")) {
-    const authToken = process.env.TURSO_AUTH_TOKEN;
-    if (!authToken || authToken === "undefined") {
-      throw new Error("TURSO_AUTH_TOKEN 环境变量未设置");
-    }
-
-    const libsqlClient = createClient({ url: dbUrl, authToken });
-    const adapter = new PrismaLibSQL(libsqlClient as any);
-    return new PrismaClient({ adapter });
-  }
-
-  // 本地 SQLite
-  return new PrismaClient({ log: ["error", "warn"] });
+  return new PrismaClient({ log: ['error', 'warn'] });
 }
 
-let _prisma: PrismaClient;
-
 function getPrismaClient(): PrismaClient {
-  if (globalForPrisma.prisma) return globalForPrisma.prisma;
-  if (_prisma) return _prisma;
-
-  _prisma = createPrismaClient();
-  globalForPrisma.prisma = _prisma;
-  return _prisma;
+  if (!globalForPrisma.prisma) globalForPrisma.prisma = createPrismaClient();
+  return globalForPrisma.prisma;
 }
 
 export const prisma = new Proxy({} as PrismaClient, {
-  get(_, prop: string | symbol) {
-    return (getPrismaClient() as any)[prop];
-  },
+  get(_: any, p: string | symbol) { return (getPrismaClient() as any)[p]; },
 });
