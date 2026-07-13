@@ -108,7 +108,6 @@ export async function POST(req: NextRequest) {
             sourceType: item.source.sourceType,
             sourceNote: item.source.sourceNote,
             sourceContext: item.source.sourceContext,
-            imageId: item.source.imageId,
           },
         });
 
@@ -151,7 +150,6 @@ export async function POST(req: NextRequest) {
           sourceType: item.source.sourceType,
           sourceNote: item.source.sourceNote,
           sourceContext: item.source.sourceContext,
-          imageId: item.source.imageId,
         },
       });
 
