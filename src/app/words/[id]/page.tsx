@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { getUserIdFromCookies } from "@/lib/auth";
 import WordActions from "./word-actions";
 
 export const dynamic = "force-dynamic";
@@ -18,14 +19,14 @@ const RESULT_LABELS: Record<string, string> = {
   forgot: "忘记",
 };
 
-async function getWordDetail(id: string) {
+async function getWordDetail(id: string, userId: string) {
   try {
     return await prisma.word.findUnique({
-      where: { id },
+      where: { id, userId },
       include: {
         sources: { orderBy: { createdAt: "desc" } },
         reviews: { orderBy: { reviewedAt: "desc" }, take: 10 },
-        schedule: true,
+        schedule: { where: { userId } },
         meanings: { orderBy: { sortOrder: "asc" } },
       },
     });
@@ -41,10 +42,12 @@ export default async function WordDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const word = await getWordDetail(id);
+  const userId = await getUserIdFromCookies();
+  const word = userId ? await getWordDetail(id, userId) : null;
 
   if (!word) notFound();
 
+  const sched = word.schedule[0];
   const highFreqMeanings = word.meanings.filter((m) => m.isHighFreq);
   const normalMeanings = word.meanings.filter((m) => !m.isHighFreq && !m.isObscure);
   const lowObscureMeanings = word.meanings.filter((m) => m.isObscure && !m.isHighFreq);
@@ -177,23 +180,23 @@ export default async function WordDetailPage({
           <div className="stat-item">
             <div className="stat-label">下次复习</div>
             <div className="stat-value">
-              {word.schedule?.nextReviewAt
-                ? new Date(word.schedule.nextReviewAt).toLocaleDateString("zh-CN", { month: "short", day: "numeric" })
+              {sched?.nextReviewAt
+                ? new Date(sched.nextReviewAt).toLocaleDateString("zh-CN", { month: "short", day: "numeric" })
                 : "未安排"}
             </div>
           </div>
           <div className="stat-item">
             <div className="stat-label">当前间隔</div>
-            <div className="stat-value">{word.schedule?.intervalDays ?? 0} 天</div>
+            <div className="stat-value">{sched?.intervalDays ?? 0} 天</div>
           </div>
           <div className="stat-item">
             <div className="stat-label">复习次数</div>
-            <div className="stat-value">{word.schedule?.reviewCount ?? 0}</div>
+            <div className="stat-value">{sched?.reviewCount ?? 0}</div>
           </div>
           <div className="stat-item">
             <div className="stat-label">上次结果</div>
             <div className="stat-value">
-              {word.schedule?.lastResult ? RESULT_LABELS[word.schedule.lastResult] || word.schedule.lastResult : "无"}
+              {sched?.lastResult ? RESULT_LABELS[sched.lastResult] || sched.lastResult : "无"}
             </div>
           </div>
         </div>

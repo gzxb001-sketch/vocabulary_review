@@ -1,38 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { requireUserId, authError } from "@/lib/api-auth";
 
-type Params = {
-  params: Promise<{ id: string }>;
-};
+type Params = { params: Promise<{ id: string }> };
 
 export async function PATCH(req: NextRequest, { params }: Params) {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return authError(); }
+
   try {
     const { id } = await params;
     const body = await req.json();
 
     const displayText = typeof body.displayText === "string" ? body.displayText.trim() : "";
-    const meaningZh = typeof body.meaningZh === "string" ? body.meaningZh.trim() : "";
-    const phonetic = typeof body.phonetic === "string" ? body.phonetic.trim() : "";
-    const partOfSpeech = typeof body.partOfSpeech === "string" ? body.partOfSpeech.trim() : "";
-    const exampleSentence =
-      typeof body.exampleSentence === "string" ? body.exampleSentence.trim() : "";
-    const note = typeof body.note === "string" ? body.note.trim() : "";
-    const lemmaInput = typeof body.lemma === "string" ? body.lemma.trim().toLowerCase() : "";
 
     if (!displayText) {
       return NextResponse.json({ message: "displayText is required" }, { status: 400 });
     }
 
     const updated = await prisma.word.update({
-      where: { id },
+      where: { id, userId },
       data: {
         displayText,
-        lemma: lemmaInput || displayText.toLowerCase(),
-        meaningZh,
-        phonetic,
-        partOfSpeech,
-        exampleSentence,
-        note,
+        lemma: (typeof body.lemma === "string" ? body.lemma.trim().toLowerCase() : "") || displayText.toLowerCase(),
+        meaningZh: typeof body.meaningZh === "string" ? body.meaningZh.trim() : "",
+        phonetic: typeof body.phonetic === "string" ? body.phonetic.trim() : "",
+        partOfSpeech: typeof body.partOfSpeech === "string" ? body.partOfSpeech.trim() : "",
+        exampleSentence: typeof body.exampleSentence === "string" ? body.exampleSentence.trim() : "",
+        note: typeof body.note === "string" ? body.note.trim() : "",
       },
     });
 
@@ -44,12 +39,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return authError(); }
+
   try {
     const { id } = await params;
 
-    await prisma.word.delete({
-      where: { id },
-    });
+    await prisma.word.delete({ where: { id, userId } });
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { getUserIdFromCookies } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-async function getHomeData() {
+async function getHomeData(userId: string) {
   try {
     const now = new Date();
     const startOfToday = new Date();
@@ -20,27 +21,30 @@ async function getHomeData() {
       recentReviews,
       sourceDistribution,
     ] = await Promise.all([
-      prisma.word.count(),
+      prisma.word.count({ where: { userId } }),
       prisma.reviewSchedule.count({
-        where: { nextReviewAt: { lte: now } },
+        where: { userId, nextReviewAt: { lte: now } },
       }),
       prisma.word.count({
-        where: { createdAt: { gte: startOfToday } },
+        where: { userId, createdAt: { gte: startOfToday } },
       }),
       prisma.review.count({
-        where: { reviewedAt: { gte: startOfToday, lt: endOfToday } },
+        where: { userId, reviewedAt: { gte: startOfToday, lt: endOfToday } },
       }),
       prisma.word.findMany({
+        where: { userId },
         orderBy: { createdAt: "desc" },
-        include: { sources: { orderBy: { createdAt: "desc" }, take: 1 } },
+        include: { sources: { orderBy: { createdAt: "desc" }, take: 1 }, schedule: { where: { userId } } },
         take: 15,
       }),
       prisma.review.findMany({
+        where: { userId },
         include: { word: true },
         orderBy: { reviewedAt: "desc" },
         take: 15,
       }),
       prisma.wordSource.groupBy({
+        where: { userId },
         by: ["sourceType"],
         _count: { sourceType: true },
         orderBy: { _count: { sourceType: "desc" } },
@@ -79,10 +83,23 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 export default async function HomePage() {
-  const data = await getHomeData();
+  const userId = await getUserIdFromCookies();
+  const user = userId ? await prisma.user.findUnique({ where: { id: userId }, select: { email: true } }) : null;
+  const data = userId ? await getHomeData(userId) : {
+    totalWordsCount: 0, dueCount: 0, todayAddedCount: 0, todayReviewedCount: 0,
+    recentWords: [], recentReviews: [], sourceDistribution: [],
+  };
 
   return (
     <main className="container">
+      {/* User bar */}
+      {user && (
+        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "var(--space-2)", marginBottom: "var(--space-2)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>
+          <span>{user.email}</span>
+          <a href="/api/auth/login" className="link-button" onClick={async (e) => { e.preventDefault(); await fetch("/api/auth/login", { method: "DELETE" }); window.location.href = "/login"; }}>退出</a>
+        </div>
+      )}
+
       {/* Hero */}
       <section className="hero-card-home">
         <p className="hero-brand">竹墨词库</p>

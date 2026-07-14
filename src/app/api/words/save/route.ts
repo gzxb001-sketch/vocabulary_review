@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { createInitialSchedule } from "@/lib/scheduler";
+import { requireUserId, authError } from "@/lib/api-auth";
 
 type MeaningInput = {
   partOfSpeech: string;
@@ -29,6 +30,9 @@ type SaveWordInput = {
 };
 
 export async function POST(req: NextRequest) {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return authError(); }
+
   try {
     const body = await req.json();
     const items: SaveWordInput[] = body.items || [];
@@ -48,6 +52,7 @@ export async function POST(req: NextRequest) {
 
       const existingWord = await prisma.word.findFirst({
         where: {
+          userId,
           OR: [
             ...(normalizedLemma ? [{ lemma: normalizedLemma }] : []),
             { displayText: normalizedDisplayText },
@@ -73,7 +78,7 @@ export async function POST(req: NextRequest) {
         // Add new meanings if provided
         if (item.meanings?.length) {
           const existingMeanings = await prisma.meaning.findMany({
-            where: { wordId: existingWord.id },
+            where: { wordId: existingWord.id, userId },
             select: { meaningZh: true, partOfSpeech: true },
           });
 
@@ -85,6 +90,7 @@ export async function POST(req: NextRequest) {
             .filter((m) => m.meaningZh && !existingSet.has(`${m.partOfSpeech}::${m.meaningZh}`))
             .map((m, i) => ({
               wordId: existingWord.id,
+              userId,
               partOfSpeech: m.partOfSpeech || "",
               meaningZh: m.meaningZh,
               exampleSentence: m.exampleSentence || null,
@@ -105,6 +111,7 @@ export async function POST(req: NextRequest) {
         await prisma.wordSource.create({
           data: {
             wordId: existingWord.id,
+            userId,
             sourceType: item.source.sourceType,
             sourceNote: item.source.sourceNote,
             sourceContext: item.source.sourceContext,
@@ -121,6 +128,7 @@ export async function POST(req: NextRequest) {
       // Step 1: Create the word
       const newWord = await prisma.word.create({
         data: {
+          userId,
           lemma: normalizedLemma || normalizedDisplayText.toLowerCase(),
           displayText: normalizedDisplayText,
           meaningZh: item.meaningZh,
@@ -135,6 +143,7 @@ export async function POST(req: NextRequest) {
       await prisma.reviewSchedule.create({
         data: {
           wordId: newWord.id,
+          userId,
           nextReviewAt: schedule.nextReviewAt,
           intervalDays: schedule.intervalDays,
           reviewCount: schedule.reviewCount,
@@ -147,6 +156,7 @@ export async function POST(req: NextRequest) {
       await prisma.wordSource.create({
         data: {
           wordId: newWord.id,
+          userId,
           sourceType: item.source.sourceType,
           sourceNote: item.source.sourceNote,
           sourceContext: item.source.sourceContext,
@@ -166,6 +176,7 @@ export async function POST(req: NextRequest) {
         await prisma.meaning.create({
           data: {
             wordId: newWord.id,
+            userId,
             partOfSpeech: m.partOfSpeech || "",
             meaningZh: m.meaningZh,
             exampleSentence: m.exampleSentence || null,

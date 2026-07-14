@@ -26,8 +26,22 @@ enum ReviewResult {
   forgot
 }
 
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  words         Word[]
+  sources       WordSource[]
+  meanings      Meaning[]
+  reviews       Review[]
+  reviewSchedule ReviewSchedule[]
+}
+
 model Word {
   id              String          @id @default(cuid())
+  userId          String
   lemma           String
   displayText     String
   meaningZh       String?
@@ -39,18 +53,21 @@ model Word {
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   sources         WordSource[]
   reviews         Review[]
-  schedule        ReviewSchedule?
+  schedule        ReviewSchedule[]
   meanings        Meaning[]
 
   @@index([lemma])
   @@index([displayText])
+  @@index([userId])
 }
 
 model Meaning {
   id                  String   @id @default(cuid())
   wordId              String
+  userId              String
   partOfSpeech        String
   meaningZh           String
   exampleSentence     String?
@@ -61,13 +78,16 @@ model Meaning {
   createdAt           DateTime @default(now())
 
   word                Word     @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([wordId])
+  @@index([userId])
 }
 
 model WordSource {
   id            String     @id @default(cuid())
   wordId        String
+  userId        String
   sourceType    SourceType
   sourceNote    String?
   sourceContext String?
@@ -75,11 +95,13 @@ model WordSource {
   createdAt     DateTime   @default(now())
 
   word          Word       @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   image         Image?     @relation(fields: [imageId], references: [id], onDelete: SetNull)
 
   @@index([wordId])
   @@index([sourceType])
   @@index([imageId])
+  @@index([userId])
 }
 
 model Image {
@@ -92,7 +114,9 @@ model Image {
 }
 
 model ReviewSchedule {
-  wordId        String        @id
+  id            String        @id @default(cuid())
+  wordId        String
+  userId        String
   nextReviewAt  DateTime
   intervalDays  Int           @default(0)
   easeScore     Float         @default(2.5)
@@ -101,19 +125,26 @@ model ReviewSchedule {
   updatedAt     DateTime      @updatedAt
 
   word          Word          @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([wordId, userId])
   @@index([nextReviewAt])
+  @@index([userId])
+  @@index([wordId])
 }
 
 model Review {
   id             String       @id @default(cuid())
   wordId         String
+  userId         String
   reviewResult   ReviewResult
   reviewedAt     DateTime     @default(now())
   intervalBefore Int?
   intervalAfter  Int?
 
   word           Word         @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([wordId, reviewedAt])
+  @@index([userId])
 }

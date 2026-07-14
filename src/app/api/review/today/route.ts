@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { requireUserId, authError } from "@/lib/api-auth";
 
 export async function GET() {
+  let userId: string;
+  try { userId = await requireUserId(); } catch { return authError(); }
+
   const now = new Date();
 
   const items = await prisma.reviewSchedule.findMany({
-    where: {
-      nextReviewAt: {
-        lte: now,
-      },
-    },
+    where: { userId, nextReviewAt: { lte: now } },
     include: {
       word: {
         include: {
@@ -18,9 +18,7 @@ export async function GET() {
         },
       },
     },
-    orderBy: {
-      nextReviewAt: "asc",
-    },
+    orderBy: { nextReviewAt: "asc" },
     take: 50,
   });
 

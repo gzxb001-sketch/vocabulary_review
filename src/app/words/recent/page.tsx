@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { getUserIdFromCookies } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-async function getRecentWords() {
+async function getRecentWords(userId: string) {
   try {
     return await prisma.word.findMany({
+      where: { userId },
       orderBy: { createdAt: "desc" },
       include: {
         meanings: { orderBy: { sortOrder: "asc" }, take: 3 },
@@ -27,7 +29,8 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 export default async function RecentWordsPage() {
-  const words = await getRecentWords();
+  const userId = await getUserIdFromCookies();
+  const words = userId ? await getRecentWords(userId) : [];
 
   return (
     <main className="container fade-in">
