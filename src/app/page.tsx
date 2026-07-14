@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getUserIdFromCookies } from "@/lib/auth";
+import LogoutButton from "./ui/logout-button";
 
 export const dynamic = "force-dynamic";
 
@@ -141,7 +142,7 @@ export default async function HomePage() {
       {user && (
         <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "var(--space-2)", marginBottom: "var(--space-2)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>
           <span>{user.email}</span>
-          <a href="/api/auth/login" className="link-button" onClick={async (e) => { e.preventDefault(); await fetch("/api/auth/login", { method: "DELETE" }); window.location.href = "/login"; }}>退出</a>
+          <LogoutButton />
         </div>
       )}
 
