@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import {
+  saveReviewItems,
+  getCachedReviewItems,
+  enqueueSubmit,
+  syncQueue,
+} from "@/lib/review-offline";
+import { DEMO_WORDS, type DemoReviewItem } from "@/lib/demo-words";
 
 type ReviewMeaning = {
   partOfSpeech: string;
@@ -29,32 +36,127 @@ const SOURCE_LABELS: Record<string, string> = {
 
 type TodayResponse = { count: number; items: ReviewItem[] };
 
+function demoToReviewItem(d: DemoReviewItem): ReviewItem {
+  return {
+    wordId: d.wordId,
+    displayText: d.displayText,
+    meaningZh: d.meaningZh,
+    phonetic: d.phonetic,
+    exampleSentence: d.exampleSentence,
+    sourceType: d.sourceType,
+    sourceNote: d.sourceNote,
+    meanings: d.meanings,
+  };
+}
+
 export default function ReviewPage() {
   const [items, setItems] = useState<ReviewItem[]>([]);
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [isOffline, setIsOffline] = useState(false);
+  const [isDemo, setIsDemo] = useState(false);
 
-  useEffect(() => {
-    fetch("/api/review/today")
-      .then((res) => res.json())
-      .then((data: TodayResponse) => { setItems(data.items || []); setLoading(false); });
+  const trySync = useCallback(async () => {
+    const { remaining } = await syncQueue();
+    setPendingCount(remaining);
   }, []);
 
-  async function submit(result: "known" | "vague" | "forgot") {
-    const current = items[index];
-    if (!current) return;
-    setSubmitting(true);
-    await fetch("/api/review/submit", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ wordId: current.wordId, result }),
-    });
-    setSubmitting(false);
-    setRevealed(false);
-    setIndex((prev) => prev + 1);
-  }
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const res = await fetch("/api/review/today");
+        if (!res.ok) throw new Error("fetch failed");
+        const data: TodayResponse = await res.json();
+        const list = (data.items || []) as ReviewItem[];
+        if (!cancelled) {
+          if (list.length > 0) {
+            setItems(list);
+            setIsDemo(false);
+          } else {
+            // 已登录但无待复习词：不降级到 demo，展示空状态
+            setItems([]);
+            setIsDemo(false);
+          }
+          setIsOffline(false);
+        }
+        // 缓存到 IndexedDB 备用
+        saveReviewItems(list);
+      } catch {
+        // API 失败：先检查是否网络问题（离线缓存），否则就是游客（demo 模式）
+        const cached = (await getCachedReviewItems()) as ReviewItem[];
+        if (!cancelled && cached.length > 0) {
+          setItems(cached);
+          setIsOffline(true);
+          setIsDemo(false);
+        } else if (!cancelled) {
+          // 游客模式：使用预置 demo 词库
+          setItems(DEMO_WORDS.map(demoToReviewItem));
+          setIsDemo(true);
+          setIsOffline(false);
+        }
+      }
+      if (!cancelled) setLoading(false);
+    }
+
+    load();
+    trySync();
+
+    // 监听网络恢复，自动同步
+    const onOnline = () => {
+      setIsOffline(false);
+      trySync();
+    };
+    const onOffline = () => setIsOffline(true);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, [trySync]);
+
+  const submit = useCallback(
+    async (result: "known" | "vague" | "forgot") => {
+      const current = items[index];
+      if (!current) return;
+
+      // 游客模式：不调 API，直接跳到下一词
+      if (isDemo) {
+        setRevealed(false);
+        setIndex((prev) => prev + 1);
+        return;
+      }
+
+      setSubmitting(true);
+
+      try {
+        const res = await fetch("/api/review/submit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ wordId: current.wordId, result }),
+        });
+        if (!res.ok) throw new Error("submit failed");
+        setIsOffline(false);
+      } catch {
+        // 离线：加入同步队列
+        await enqueueSubmit({ wordId: current.wordId, result });
+        setIsOffline(true);
+        await trySync();
+      }
+
+      setSubmitting(false);
+      setRevealed(false);
+      setIndex((prev) => prev + 1);
+    },
+    [items, index, trySync, isDemo]
+  );
 
   if (loading) {
     return (
@@ -86,14 +188,29 @@ export default function ReviewPage() {
   if (index >= items.length) {
     return (
       <main className="container fade-in">
-        <div className="card empty-state">
-          <span className="empty-state-icon">🎉</span>
-          <h1 className="empty-state-title">今天复习完成</h1>
-          <p className="empty-state-text">这一轮已经结束，明天再继续。</p>
-          <div className="link-row">
-            <Link href="/" className="link-button">返回首页</Link>
+        {isDemo ? (
+          <div className="card empty-state">
+            <span className="empty-state-icon">🎉</span>
+            <h1 className="empty-state-title">体验完成</h1>
+            <p className="empty-state-text">
+              这只是演示模式。注册账号后，你可以录入自己的词库、<br />
+              拍照提取生词、用间隔记忆法科学复习。
+            </p>
+            <div className="link-row">
+              <Link href="/login" className="link-button">免费注册</Link>
+              <Link href="/" className="link-button secondary">返回首页</Link>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="card empty-state">
+            <span className="empty-state-icon">🎉</span>
+            <h1 className="empty-state-title">今天复习完成</h1>
+            <p className="empty-state-text">这一轮已经结束，明天再继续。</p>
+            <div className="link-row">
+              <Link href="/" className="link-button">返回首页</Link>
+            </div>
+          </div>
+        )}
       </main>
     );
   }
@@ -106,6 +223,22 @@ export default function ReviewPage() {
     <main className="container fade-in">
       <div className="card stack">
         <div className="progress-badge">{index + 1} / {items.length}</div>
+
+        {isDemo && (
+          <div className="alert alert-info" style={{ textAlign: "center" }}>
+            体验模式 · 注册后解锁完整功能
+          </div>
+        )}
+        {isOffline && (
+          <div className="alert alert-warning" style={{ textAlign: "center" }}>
+            离线模式 · 数据可能不是最新
+          </div>
+        )}
+        {pendingCount > 0 && (
+          <div className="alert alert-info" style={{ textAlign: "center" }}>
+            {pendingCount} 条答题结果将在联网后自动同步
+          </div>
+        )}
 
         <h1 className="flashcard-word">{current.displayText}</h1>
 

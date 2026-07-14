@@ -2,6 +2,7 @@ import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import NavLinks from "./nav-links";
+import ServiceWorkerRegister from "./ui/service-worker-register";
 
 export const metadata: Metadata = {
   title: "竹墨词库",
@@ -43,6 +44,7 @@ export default function RootLayout({
           </div>
         </nav>
         {children}
+        <ServiceWorkerRegister />
       </body>
     </html>
   );

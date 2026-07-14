@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getUserIdFromCookies } from "@/lib/auth";
 import LogoutButton from "./ui/logout-button";
+import { DEMO_WORDS } from "@/lib/demo-words";
 
 export const dynamic = "force-dynamic";
 
@@ -136,53 +137,94 @@ export default async function HomePage() {
     );
   }
 
+  const isGuest = !user;
+
   return (
     <main className="container">
       {/* User bar */}
-      {user && (
+      {user ? (
         <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "var(--space-2)", marginBottom: "var(--space-2)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>
           <span>{user.email}</span>
           <LogoutButton />
         </div>
+      ) : (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "var(--space-2)" }}>
+          <Link href="/login" style={{ fontSize: "var(--text-sm)", color: "var(--color-primary)", fontWeight: "var(--font-semibold)" }}>
+            登录 / 注册
+          </Link>
+        </div>
       )}
 
       {/* Hero */}
-      <section className="hero-card-home">
-        <p className="hero-brand">竹墨词库</p>
-        {data.dueCount > 0 ? (
-          <>
-            <p className="hero-due-count">{data.dueCount}</p>
-            <p className="hero-due-label">个词待复习</p>
-          </>
-        ) : (
-          <p className="hero-due-label">今天没有待复习</p>
-        )}
-        <div className="hero-btns">
-          <Link href="/review" className="hero-btn-primary">开始复习</Link>
-          <Link href="/manual" className="hero-btn-secondary">手动录词</Link>
-          <Link href="/capture" className="hero-btn-secondary">拍照录词</Link>
-        </div>
-      </section>
+      {isGuest ? (
+        <section className="hero-card-home">
+          <p className="hero-brand">竹墨词库</p>
+          <p className="hero-due-count">{DEMO_WORDS.length}</p>
+          <p className="hero-due-label">个预置词，免费体验</p>
+          <div className="hero-btns">
+            <Link href="/review" className="hero-btn-primary">开始体验</Link>
+            <Link href="/login" className="hero-btn-secondary">注册账号</Link>
+          </div>
+        </section>
+      ) : (
+        <section className="hero-card-home">
+          <p className="hero-brand">竹墨词库</p>
+          {data.dueCount > 0 ? (
+            <>
+              <p className="hero-due-count">{data.dueCount}</p>
+              <p className="hero-due-label">个词待复习</p>
+            </>
+          ) : (
+            <p className="hero-due-label">今天没有待复习</p>
+          )}
+          <div className="hero-btns">
+            <Link href="/review" className="hero-btn-primary">开始复习</Link>
+            <Link href="/manual" className="hero-btn-secondary">手动录词</Link>
+            <Link href="/capture" className="hero-btn-secondary">拍照录词</Link>
+          </div>
+        </section>
+      )}
 
       {/* Stats */}
-      <section className="home-stats-row">
-        <div className="home-stat-card">
-          <span className="home-stat-num">{data.totalWordsCount}</span>
-          <span className="home-stat-label">词条总数</span>
-        </div>
-        <div className="home-stat-card is-due">
-          <span className="home-stat-num">{data.dueCount}</span>
-          <span className="home-stat-label">待复习</span>
-        </div>
-        <div className="home-stat-card">
-          <span className="home-stat-num">{data.todayAddedCount}</span>
-          <span className="home-stat-label">今日新增</span>
-        </div>
-        <div className="home-stat-card">
-          <span className="home-stat-num">{data.todayReviewedCount}</span>
-          <span className="home-stat-label">今日复习</span>
-        </div>
-      </section>
+      {isGuest ? (
+        <section className="home-stats-row">
+          <div className="home-stat-card">
+            <span className="home-stat-num">{DEMO_WORDS.length}</span>
+            <span className="home-stat-label">预置词条</span>
+          </div>
+          <div className="home-stat-card is-due">
+            <span className="home-stat-num">{DEMO_WORDS.length}</span>
+            <span className="home-stat-label">可体验</span>
+          </div>
+          <div className="home-stat-card">
+            <span className="home-stat-num">∞</span>
+            <span className="home-stat-label">间隔复习</span>
+          </div>
+          <div className="home-stat-card">
+            <span className="home-stat-num">OCR</span>
+            <span className="home-stat-label">拍照录词</span>
+          </div>
+        </section>
+      ) : (
+        <section className="home-stats-row">
+          <div className="home-stat-card">
+            <span className="home-stat-num">{data.totalWordsCount}</span>
+            <span className="home-stat-label">词条总数</span>
+          </div>
+          <div className="home-stat-card is-due">
+            <span className="home-stat-num">{data.dueCount}</span>
+            <span className="home-stat-label">待复习</span>
+          </div>
+          <div className="home-stat-card">
+            <span className="home-stat-num">{data.todayAddedCount}</span>
+            <span className="home-stat-label">今日新增</span>
+          </div>
+          <div className="home-stat-card">
+            <span className="home-stat-num">{data.todayReviewedCount}</span>
+            <span className="home-stat-label">今日复习</span>
+          </div>
+        </section>
+      )}
 
       {/* 竹节分隔 */}
       <div className="bamboo-divider">
@@ -190,50 +232,89 @@ export default async function HomePage() {
       </div>
 
       {/* 最近 */}
-      <section className="home-two-col">
-        <div className="card home-col-card">
-          <div className="home-col-header">
-            <h2 className="home-section-title">最近新增</h2>
-            <Link href="/words/recent" className="home-col-more">全部 →</Link>
-          </div>
-          {data.recentWords.length === 0 ? (
-            <p className="empty-hint">还没有词条</p>
-          ) : (
-            <div className="home-tag-cloud">
-              {data.recentWords.map((word) => (
-                <Link key={word.id} href={`/words/${word.id}`} className="home-word-tag">
-                  {word.displayText}
-                </Link>
-              ))}
+      {isGuest ? (
+        <>
+          <section className="home-two-col">
+            <div className="card home-col-card">
+              <div className="home-col-header">
+                <h2 className="home-section-title">预置体验词</h2>
+              </div>
+              <div className="home-tag-cloud">
+                {DEMO_WORDS.map((word) => (
+                  <Link key={word.wordId} href="/review" className="home-word-tag">
+                    {word.displayText}
+                  </Link>
+                ))}
+              </div>
             </div>
-          )}
-        </div>
 
-        <div className="card home-col-card">
-          <div className="home-col-header">
-            <h2 className="home-section-title">最近复习</h2>
-            <Link href="/review" className="home-col-more">全部 →</Link>
-          </div>
-          {data.recentReviews.length === 0 ? (
-            <p className="empty-hint">还没有复习记录</p>
-          ) : (
-            <div className="home-tag-cloud">
-              {data.recentReviews.map((review) => (
-                <Link
-                  key={review.id}
-                  href={`/words/${review.word.id}`}
-                  className={`home-word-tag tag-${review.reviewResult}`}
-                >
-                  {review.word.displayText}
-                </Link>
-              ))}
+            <div className="card home-col-card">
+              <div className="home-col-header">
+                <h2 className="home-section-title">注册后解锁</h2>
+              </div>
+              <div className="home-tag-cloud">
+                <span className="home-word-tag">📚 无限词库</span>
+                <span className="home-word-tag">📸 拍照录词</span>
+                <span className="home-word-tag">📊 学习统计</span>
+                <span className="home-word-tag">🔄 间隔记忆</span>
+              </div>
             </div>
-          )}
-        </div>
-      </section>
+          </section>
 
-      {/* 来源分布 */}
-      {data.sourceDistribution.length > 0 && (
+          {/* 游客注册引导 */}
+          <div className="card" style={{ marginTop: "var(--space-4)", textAlign: "center", padding: "var(--space-6)" }}>
+            <p style={{ margin: "0 0 var(--space-3)", color: "var(--color-text-secondary)", fontSize: "var(--text-md)", lineHeight: "var(--leading-relaxed)" }}>
+              注册账号即可拥有自己的专属词库，<br />拍照录词、间隔复习、数据永久保存。
+            </p>
+            <Link href="/login" className="link-button">免费注册</Link>
+          </div>
+        </>
+      ) : (
+        <section className="home-two-col">
+          <div className="card home-col-card">
+            <div className="home-col-header">
+              <h2 className="home-section-title">最近新增</h2>
+              <Link href="/words/recent" className="home-col-more">全部 →</Link>
+            </div>
+            {data.recentWords.length === 0 ? (
+              <p className="empty-hint">还没有词条</p>
+            ) : (
+              <div className="home-tag-cloud">
+                {data.recentWords.map((word) => (
+                  <Link key={word.id} href={`/words/${word.id}`} className="home-word-tag">
+                    {word.displayText}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="card home-col-card">
+            <div className="home-col-header">
+              <h2 className="home-section-title">最近复习</h2>
+              <Link href="/review" className="home-col-more">全部 →</Link>
+            </div>
+            {data.recentReviews.length === 0 ? (
+              <p className="empty-hint">还没有复习记录</p>
+            ) : (
+              <div className="home-tag-cloud">
+                {data.recentReviews.map((review) => (
+                  <Link
+                    key={review.id}
+                    href={`/words/${review.word.id}`}
+                    className={`home-word-tag tag-${review.reviewResult}`}
+                  >
+                    {review.word.displayText}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* 来源分布 — 仅登录用户 */}
+      {!isGuest && data.sourceDistribution.length > 0 && (
         <details className="source-detail">
           <summary className="source-detail-summary">来源分布</summary>
           <div className="source-tag-row">
