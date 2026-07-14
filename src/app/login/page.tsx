@@ -1,15 +1,24 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.user) window.location.href = "/";
+        else setChecking(false);
+      })
+      .catch(() => setChecking(false));
+  }, []);
 
   async function handleSubmit() {
     setError("");
@@ -38,13 +47,23 @@ export default function LoginPage() {
         return;
       }
 
-      router.push("/");
-      router.refresh();
+      window.location.href = "/";
     } catch {
       setError("网络错误，请稍后重试");
     } finally {
       setLoading(false);
     }
+  }
+
+  if (checking) {
+    return (
+      <main className="container fade-in">
+        <div className="card stack" style={{ maxWidth: 420, margin: "var(--space-8) auto", textAlign: "center" }}>
+          <h1 className="title">竹墨词库</h1>
+          <p className="muted">检查登录状态...</p>
+        </div>
+      </main>
+    );
   }
 
   return (
