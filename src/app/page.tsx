@@ -83,12 +83,57 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 export default async function HomePage() {
-  const userId = await getUserIdFromCookies();
-  const user = userId ? await prisma.user.findUnique({ where: { id: userId }, select: { email: true } }) : null;
-  const data = userId ? await getHomeData(userId) : {
-    totalWordsCount: 0, dueCount: 0, todayAddedCount: 0, todayReviewedCount: 0,
-    recentWords: [], recentReviews: [], sourceDistribution: [],
-  };
+  let userId: string | null = null;
+  let user: { email: string } | null = null;
+
+  try {
+    userId = await getUserIdFromCookies();
+    user = userId
+      ? await prisma.user.findUnique({
+          where: { id: userId },
+          select: { email: true },
+        })
+      : null;
+  } catch (e: any) {
+    return (
+      <main className="container">
+        <div className="card">
+          <h1 className="title">竹墨词库</h1>
+          <p className="muted" style={{ color: "#dc2626", whiteSpace: "pre-wrap" }}>
+            用户查询失败: {String(e?.message || e)}
+          </p>
+          <a href="/login" className="button">重新登录</a>
+        </div>
+      </main>
+    );
+  }
+
+  let data: Awaited<ReturnType<typeof getHomeData>>;
+  try {
+    data = userId
+      ? await getHomeData(userId)
+      : {
+          totalWordsCount: 0,
+          dueCount: 0,
+          todayAddedCount: 0,
+          todayReviewedCount: 0,
+          recentWords: [],
+          recentReviews: [],
+          sourceDistribution: [],
+        };
+  } catch (e: any) {
+    return (
+      <main className="container">
+        <div className="card">
+          <h1 className="title">竹墨词库</h1>
+          <p className="muted" style={{ color: "#dc2626", whiteSpace: "pre-wrap" }}>
+            数据加载失败: {String(e?.message || e)}
+          </p>
+          <a href="/login" className="button">重新登录</a>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="container">
