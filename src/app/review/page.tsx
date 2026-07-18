@@ -59,7 +59,6 @@ export default function ReviewPage() {
   const [isOffline, setIsOffline] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
   const [pausing, setPausing] = useState(false);
-  const [pauseCountdown, setPauseCountdown] = useState(3);
   const [wasEndedEarly, setWasEndedEarly] = useState(false);
 
   const trySync = useCallback(async () => {
@@ -133,7 +132,6 @@ export default function ReviewPage() {
       // 游客模式：不调 API，进入暂停
       if (isDemo) {
         setPausing(true);
-        setPauseCountdown(3);
         return;
       }
 
@@ -156,23 +154,16 @@ export default function ReviewPage() {
 
       setSubmitting(false);
       setPausing(true);
-      setPauseCountdown(3);
     },
     [items, index, trySync, isDemo]
   );
 
-  // 暂停倒计时：3 秒后自动进入下一词
-  useEffect(() => {
-    if (!pausing) return;
-    if (pauseCountdown <= 0) {
-      setPausing(false);
-      setRevealed(false);
-      setIndex((prev) => prev + 1);
-      return;
-    }
-    const timer = setTimeout(() => setPauseCountdown((c) => c - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [pausing, pauseCountdown]);
+  // 直接进入下一词
+  function nextWord() {
+    setPausing(false);
+    setRevealed(false);
+    setIndex((prev) => prev + 1);
+  }
 
   // 提前结束本轮
   function endSession() {
@@ -319,15 +310,20 @@ export default function ReviewPage() {
 
             {pausing ? (
               <div className="stack" style={{ textAlign: "center" }}>
-                <p className="muted" style={{ fontSize: "var(--text-md)" }}>
-                  已记录 · {pauseCountdown}s 后进入下一词
+                <p className="muted" style={{ fontSize: "var(--text-md)", marginBottom: "var(--space-3)" }}>
+                  已记录
                 </p>
-                <button
-                  className="button button-secondary"
-                  onClick={() => { setPausing(false); setPauseCountdown(0); }}
-                >
-                  再看一眼
-                </button>
+                <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "center" }}>
+                  <button className="button" onClick={nextWord}>
+                    下一词
+                  </button>
+                  <button
+                    className="button button-secondary"
+                    onClick={() => setPausing(false)}
+                  >
+                    再看一眼
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="answer-buttons">
