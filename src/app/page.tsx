@@ -13,6 +13,7 @@ async function getHomeData(userId: string) {
     startOfToday.setHours(0, 0, 0, 0);
     const endOfToday = new Date(startOfToday);
     endOfToday.setDate(endOfToday.getDate() + 1);
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
     const [
       totalWordsCount,
@@ -22,6 +23,9 @@ async function getHomeData(userId: string) {
       recentWords,
       recentReviews,
       sourceDistribution,
+      weeklyKnownCount,
+      weeklyTotalCount,
+      stubbornWords,
     ] = await Promise.all([
       prisma.word.count({ where: { userId } }),
       prisma.reviewSchedule.count({
@@ -37,13 +41,13 @@ async function getHomeData(userId: string) {
         where: { userId },
         orderBy: { createdAt: "desc" },
         include: { sources: { orderBy: { createdAt: "desc" }, take: 1 }, schedule: { where: { userId } } },
-        take: 15,
+        take: 10,
       }),
       prisma.review.findMany({
         where: { userId },
         include: { word: true },
         orderBy: { reviewedAt: "desc" },
-        take: 15,
+        take: 10,
       }),
       prisma.wordSource.groupBy({
         where: { userId },
@@ -51,7 +55,47 @@ async function getHomeData(userId: string) {
         _count: { sourceType: true },
         orderBy: { _count: { sourceType: "desc" } },
       }),
+      // 本周认识次数
+      prisma.review.count({
+        where: { userId, reviewResult: "known", reviewedAt: { gte: sevenDaysAgo } },
+      }),
+      // 本周总复习次数
+      prisma.review.count({
+        where: { userId, reviewedAt: { gte: sevenDaysAgo } },
+      }),
+      // 顽固词：easeScore 最低 + reviewCount 最高的 top 5
+      prisma.reviewSchedule.findMany({
+        where: { userId, reviewCount: { gt: 2 } },
+        include: { word: { select: { id: true, displayText: true, meaningZh: true } } },
+        orderBy: [{ easeScore: "asc" }, { reviewCount: "desc" }],
+        take: 5,
+      }),
     ]);
+
+    const weeklyKnownRate =
+      weeklyTotalCount > 0 ? Math.round((weeklyKnownCount / weeklyTotalCount) * 100) : 0;
+
+    // 连续打卡天数
+    const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    const allReviews = await prisma.review.findMany({
+      where: { userId, reviewedAt: { gte: ninetyDaysAgo } },
+      select: { reviewedAt: true },
+      orderBy: { reviewedAt: "desc" },
+    });
+    const reviewDays = new Set<string>();
+    for (const r of allReviews) {
+      const d = new Date(r.reviewedAt);
+      reviewDays.add(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`);
+    }
+    let streak = 0;
+    const checkDate = new Date(now);
+    const todayKey = `${checkDate.getFullYear()}-${checkDate.getMonth()}-${checkDate.getDate()}`;
+    if (!reviewDays.has(todayKey)) checkDate.setDate(checkDate.getDate() - 1);
+    for (let i = 0; i < 90; i++) {
+      const key = `${checkDate.getFullYear()}-${checkDate.getMonth()}-${checkDate.getDate()}`;
+      if (reviewDays.has(key)) { streak++; checkDate.setDate(checkDate.getDate() - 1); }
+      else break;
+    }
 
     return {
       totalWordsCount,
@@ -61,6 +105,10 @@ async function getHomeData(userId: string) {
       recentWords,
       recentReviews,
       sourceDistribution,
+      weeklyTotalCount,
+      weeklyKnownRate,
+      stubbornWords,
+      streak,
     };
   } catch (error) {
     console.error("homepage data fetch failed:", error);
@@ -72,6 +120,10 @@ async function getHomeData(userId: string) {
       recentWords: [],
       recentReviews: [],
       sourceDistribution: [],
+      weeklyTotalCount: 0,
+      weeklyKnownRate: 0,
+      stubbornWords: [],
+      streak: 0,
     };
   }
 }
@@ -122,6 +174,10 @@ export default async function HomePage() {
           recentWords: [],
           recentReviews: [],
           sourceDistribution: [],
+          weeklyTotalCount: 0,
+          weeklyKnownRate: 0,
+          stubbornWords: [],
+          streak: 0,
         };
   } catch (e: any) {
     return (
@@ -169,6 +225,11 @@ export default async function HomePage() {
       ) : (
         <section className="hero-card-home">
           <p className="hero-brand">竹墨词库</p>
+          {data.streak > 1 && (
+            <p className="hero-streak">
+              🔥 已连续打卡 <strong>{data.streak}</strong> 天
+            </p>
+          )}
           {data.dueCount > 0 ? (
             <>
               <p className="hero-due-count">{data.dueCount}</p>
@@ -230,6 +291,31 @@ export default async function HomePage() {
       <div className="bamboo-divider">
         <span className="bamboo-divider-icon" />
       </div>
+
+      {/* 本周复习效率（仅登录用户） */}
+      {!isGuest && (
+        <section className="card" style={{ marginBottom: "var(--space-4)", padding: "var(--space-4)" }}>
+          <h2 className="home-section-title">本周复习</h2>
+          <div style={{ display: "flex", gap: "var(--space-4)", alignItems: "center", flexWrap: "wrap" }}>
+            <div>
+              <span style={{ fontSize: "var(--text-2xl)", fontWeight: "var(--font-bold)", color: "var(--color-primary)" }}>
+                {data.weeklyTotalCount}
+              </span>
+              <span style={{ marginLeft: "var(--space-1)", color: "var(--color-text-secondary)", fontSize: "var(--text-sm)" }}>
+                次复习
+              </span>
+            </div>
+            <div>
+              <span style={{ fontSize: "var(--text-2xl)", fontWeight: "var(--font-bold)", color: data.weeklyKnownRate >= 60 ? "var(--color-success, #16a34a)" : "var(--color-warning, #ca8a04)" }}>
+                {data.weeklyKnownRate}%
+              </span>
+              <span style={{ marginLeft: "var(--space-1)", color: "var(--color-text-secondary)", fontSize: "var(--text-sm)" }}>
+                认识率
+              </span>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* 最近 */}
       {isGuest ? (
@@ -309,6 +395,23 @@ export default async function HomePage() {
                 ))}
               </div>
             )}
+          </div>
+        </section>
+      )}
+
+      {/* 顽固词 — 仅登录用户 */}
+      {!isGuest && data.stubbornWords.length > 0 && (
+        <section className="card" style={{ marginTop: "var(--space-4)", padding: "var(--space-4)" }}>
+          <h2 className="home-section-title">顽固词 · 集中攻克</h2>
+          <div className="home-tag-cloud">
+            {data.stubbornWords.map((s) => (
+              <Link key={s.wordId} href={`/words/${s.word.id}`} className="home-word-tag stubborn">
+                {s.word.displayText}
+                <span className="stubborn-badge" title={`复习${s.reviewCount}次 · 难度${s.easeScore.toFixed(1)}`}>
+                  {s.reviewCount}次
+                </span>
+              </Link>
+            ))}
           </div>
         </section>
       )}

@@ -5,8 +5,8 @@ import NavLinks from "./nav-links";
 import ServiceWorkerRegister from "./ui/service-worker-register";
 
 export const metadata: Metadata = {
-  title: "竹墨词库",
-  description: "个人词汇复习工具 — 竹林主题",
+  title: "竹墨词库 — 碎片化词汇复习",
+  description: "个人词汇复习工具，支持拍照录词、间隔重复记忆。竹韵清幽，碎片时间轻松背单词。",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -15,6 +15,13 @@ export const metadata: Metadata = {
   },
   other: {
     "mobile-web-app-capable": "yes",
+  },
+  openGraph: {
+    title: "竹墨词库 — 碎片化词汇复习",
+    description: "拍照录词 · 间隔记忆 · 考研复习利器",
+    type: "website",
+    locale: "zh_CN",
+    siteName: "竹墨词库",
   },
 };
 

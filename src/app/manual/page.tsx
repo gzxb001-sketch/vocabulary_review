@@ -110,25 +110,55 @@ export default function ManualPage() {
           {enriching ? "补全中..." : "自动补全"}
         </button>
 
-        {/* 补全结果预览 */}
+        {/* 补全结果预览（可编辑） */}
         {meanings.length > 0 && (
           <div className="meaning-preview">
             <h3 className="section-title" style={{ marginBottom: "var(--space-2)" }}>
-              识别的义项（{meanings.length} 条）
+              识别的义项（{meanings.length} 条）— 可修改
             </h3>
             {meanings.map((m, i) => (
               <div key={i} className={`meaning-item${m.isObscure ? " meaning-obscure" : ""}`}>
                 <div className="meaning-header">
                   <span className="meta-chip">{m.partOfSpeech}</span>
-                  <strong className="meaning-zh">{m.meaningZh}</strong>
+                  <input
+                    className="input"
+                    style={{ flex: 1, fontSize: "var(--text-sm)", padding: "var(--space-1) var(--space-2)" }}
+                    value={m.meaningZh}
+                    onChange={(e) => {
+                      const next = [...meanings];
+                      next[i] = { ...next[i], meaningZh: e.target.value };
+                      setMeanings(next);
+                    }}
+                    placeholder="释义"
+                  />
                   {m.isHighFreq && <span className="highfreq-tag">高频</span>}
                   {m.isObscure && <span className="obscure-tag">僻义</span>}
                 </div>
-                {m.exampleSentence && (
-                  <div>
-                    <p className="meaning-example">{m.exampleSentence}</p>
-                    {m.exampleTranslation && (
-                      <p className="meaning-trans">{m.exampleTranslation}</p>
+                {m.exampleSentence !== undefined && (
+                  <div style={{ marginTop: "var(--space-1)" }}>
+                    <input
+                      className="input"
+                      style={{ fontSize: "var(--text-xs)", padding: "var(--space-1) var(--space-2)", color: "var(--color-text-secondary)" }}
+                      value={m.exampleSentence}
+                      onChange={(e) => {
+                        const next = [...meanings];
+                        next[i] = { ...next[i], exampleSentence: e.target.value };
+                        setMeanings(next);
+                      }}
+                      placeholder="例句"
+                    />
+                    {m.exampleTranslation !== undefined && (
+                      <input
+                        className="input"
+                        style={{ fontSize: "var(--text-xs)", padding: "var(--space-1) var(--space-2)", color: "var(--color-text-muted)" }}
+                        value={m.exampleTranslation}
+                        onChange={(e) => {
+                          const next = [...meanings];
+                          next[i] = { ...next[i], exampleTranslation: e.target.value };
+                          setMeanings(next);
+                        }}
+                        placeholder="例句翻译"
+                      />
                     )}
                   </div>
                 )}

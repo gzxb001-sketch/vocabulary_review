@@ -63,119 +63,20 @@ export async function POST(req: NextRequest) {
       if (existingWord) {
         duplicates += 1;
 
-        // Update existing word
-        await prisma.word.update({
-          where: { id: existingWord.id },
-          data: {
-            meaningZh: existingWord.meaningZh || item.meaningZh,
-            phonetic: existingWord.phonetic || item.phonetic,
-            partOfSpeech: existingWord.partOfSpeech || item.partOfSpeech,
-            exampleSentence: existingWord.exampleSentence || item.exampleSentence,
-            note: existingWord.note || item.note,
-          },
+        // 收集新义项
+        const existingMeanings = await prisma.meaning.findMany({
+          where: { wordId: existingWord.id, userId },
+          select: { meaningZh: true, partOfSpeech: true },
         });
 
-        // Add new meanings if provided
-        if (item.meanings?.length) {
-          const existingMeanings = await prisma.meaning.findMany({
-            where: { wordId: existingWord.id, userId },
-            select: { meaningZh: true, partOfSpeech: true },
-          });
+        const existingSet = new Set(
+          existingMeanings.map((m) => `${m.partOfSpeech}::${m.meaningZh}`)
+        );
 
-          const existingSet = new Set(
-            existingMeanings.map((m) => `${m.partOfSpeech}::${m.meaningZh}`)
-          );
-
-          const newMeanings = item.meanings
-            .filter((m) => m.meaningZh && !existingSet.has(`${m.partOfSpeech}::${m.meaningZh}`))
-            .map((m, i) => ({
-              wordId: existingWord.id,
-              userId,
-              partOfSpeech: m.partOfSpeech || "",
-              meaningZh: m.meaningZh,
-              exampleSentence: m.exampleSentence || null,
-              exampleTranslation: m.exampleTranslation || null,
-              isObscure: m.isObscure || false,
-              isHighFreq: m.isHighFreq || false,
-              sortOrder: existingMeanings.length + i,
-            }));
-
-          if (newMeanings.length > 0) {
-            // Use individual create instead of createMany for Turso compatibility
-            for (const m of newMeanings) {
-              await prisma.meaning.create({ data: m });
-            }
-          }
-        }
-
-        await prisma.wordSource.create({
-          data: {
+        const newMeaningsData = (item.meanings || [])
+          .filter((m) => m.meaningZh && !existingSet.has(`${m.partOfSpeech}::${m.meaningZh}`))
+          .map((m, i) => ({
             wordId: existingWord.id,
-            userId,
-            sourceType: item.source.sourceType,
-            sourceNote: item.source.sourceNote,
-            sourceContext: item.source.sourceContext,
-          },
-        });
-
-        continue;
-      }
-
-      // --- Create new word (sequential writes, no nested creates for Turso compat) ---
-
-      const schedule = createInitialSchedule();
-
-      // Step 1: Create the word
-      const newWord = await prisma.word.create({
-        data: {
-          userId,
-          lemma: normalizedLemma || normalizedDisplayText.toLowerCase(),
-          displayText: normalizedDisplayText,
-          meaningZh: item.meaningZh,
-          phonetic: item.phonetic,
-          partOfSpeech: item.partOfSpeech,
-          exampleSentence: item.exampleSentence,
-          note: item.note,
-        },
-      });
-
-      // Step 2: Create review schedule
-      await prisma.reviewSchedule.create({
-        data: {
-          wordId: newWord.id,
-          userId,
-          nextReviewAt: schedule.nextReviewAt,
-          intervalDays: schedule.intervalDays,
-          reviewCount: schedule.reviewCount,
-          easeScore: schedule.easeScore,
-          lastResult: schedule.lastResult,
-        },
-      });
-
-      // Step 3: Create word source
-      await prisma.wordSource.create({
-        data: {
-          wordId: newWord.id,
-          userId,
-          sourceType: item.source.sourceType,
-          sourceNote: item.source.sourceNote,
-          sourceContext: item.source.sourceContext,
-        },
-      });
-
-      // Step 4: Create meanings
-      const meaningsToCreate = ((item.meanings || []).length > 0
-        ? item.meanings!
-        : item.partOfSpeech || item.meaningZh
-          ? [{ partOfSpeech: item.partOfSpeech || "", meaningZh: item.meaningZh || "" }]
-          : []
-      ).filter((m) => m.meaningZh); // skip empty meanings
-
-      for (let i = 0; i < meaningsToCreate.length; i++) {
-        const m = meaningsToCreate[i];
-        await prisma.meaning.create({
-          data: {
-            wordId: newWord.id,
             userId,
             partOfSpeech: m.partOfSpeech || "",
             meaningZh: m.meaningZh,
@@ -183,10 +84,99 @@ export async function POST(req: NextRequest) {
             exampleTranslation: m.exampleTranslation || null,
             isObscure: m.isObscure || false,
             isHighFreq: m.isHighFreq || false,
-            sortOrder: i,
-          },
-        });
+            sortOrder: existingMeanings.length + i,
+          }));
+
+        // 批量写入：合并 word.update + source.create + meaning creates
+        await prisma.$transaction([
+          prisma.word.update({
+            where: { id: existingWord.id },
+            data: {
+              meaningZh: existingWord.meaningZh || item.meaningZh,
+              phonetic: existingWord.phonetic || item.phonetic,
+              partOfSpeech: existingWord.partOfSpeech || item.partOfSpeech,
+              exampleSentence: existingWord.exampleSentence || item.exampleSentence,
+              note: existingWord.note || item.note,
+            },
+          }),
+          prisma.wordSource.create({
+            data: {
+              wordId: existingWord.id,
+              userId,
+              sourceType: item.source.sourceType,
+              sourceNote: item.source.sourceNote,
+              sourceContext: item.source.sourceContext,
+            },
+          }),
+          ...newMeaningsData.map((m) => prisma.meaning.create({ data: m })),
+        ]);
+
+        continue;
       }
+
+      // --- Create new word（批量写入：word + schedule + source + meanings 合并到一个事务） ---
+
+      const schedule = createInitialSchedule();
+
+      const meaningsToCreate = ((item.meanings || []).length > 0
+        ? item.meanings!
+        : item.partOfSpeech || item.meaningZh
+          ? [{ partOfSpeech: item.partOfSpeech || "", meaningZh: item.meaningZh || "" }]
+          : []
+      ).filter((m) => m.meaningZh);
+
+      const newWordId = crypto.randomUUID();
+
+      await prisma.$transaction([
+        prisma.word.create({
+          data: {
+            id: newWordId,
+            userId,
+            lemma: normalizedLemma || normalizedDisplayText.toLowerCase(),
+            displayText: normalizedDisplayText,
+            meaningZh: item.meaningZh,
+            phonetic: item.phonetic,
+            partOfSpeech: item.partOfSpeech,
+            exampleSentence: item.exampleSentence,
+            note: item.note,
+          },
+        }),
+        prisma.reviewSchedule.create({
+          data: {
+            wordId: newWordId,
+            userId,
+            nextReviewAt: schedule.nextReviewAt,
+            intervalDays: schedule.intervalDays,
+            reviewCount: schedule.reviewCount,
+            easeScore: schedule.easeScore,
+            lastResult: schedule.lastResult,
+          },
+        }),
+        prisma.wordSource.create({
+          data: {
+            wordId: newWordId,
+            userId,
+            sourceType: item.source.sourceType,
+            sourceNote: item.source.sourceNote,
+            sourceContext: item.source.sourceContext,
+          },
+        }),
+        ...meaningsToCreate.map((m, i) =>
+          prisma.meaning.create({
+            data: {
+              wordId: newWordId,
+              userId,
+              partOfSpeech: m.partOfSpeech || "",
+              meaningZh: m.meaningZh,
+              exampleSentence: m.exampleSentence || null,
+              exampleTranslation: m.exampleTranslation || null,
+              isObscure: m.isObscure || false,
+              isHighFreq: m.isHighFreq || false,
+              sortOrder: i,
+            },
+          })
+        ),
+      ]);
 
       saved += 1;
     }

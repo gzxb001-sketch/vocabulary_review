@@ -177,6 +177,36 @@ export default async function WordDetailPage({
       <div className="card stack">
         <h2 className="section-title">当前复习状态</h2>
         <div className="stat-grid">
+
+          {word.reviews.length > 0 && (
+            <div className="stat-item" style={{ gridColumn: "1 / -1" }}>
+              <div className="stat-label" style={{ marginBottom: "var(--space-2)" }}>复习趋势（最近 10 次）</div>
+              <div style={{ display: "flex", gap: "4px", alignItems: "flex-end", height: "24px" }}>
+                {word.reviews.map((r) => {
+                  const colors: Record<string, string> = { known: "#16a34a", vague: "#ca8a04", forgot: "#dc2626" };
+                  return (
+                    <div
+                      key={r.id}
+                      title={`${RESULT_LABELS[r.reviewResult] || r.reviewResult} · ${new Date(r.reviewedAt).toLocaleDateString("zh-CN")}`}
+                      style={{
+                        flex: 1,
+                        height: "100%",
+                        borderRadius: "var(--radius-sm)",
+                        background: colors[r.reviewResult] || "#9ca3af",
+                        opacity: 0.75,
+                        cursor: "default",
+                      }}
+                    />
+                  );
+                })}
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-xs)", color: "var(--color-text-muted)", marginTop: "var(--space-1)" }}>
+                <span>远</span>
+                <span>近</span>
+              </div>
+            </div>
+          )}
+
           <div className="stat-item">
             <div className="stat-label">下次复习</div>
             <div className="stat-value">

@@ -167,12 +167,16 @@ function lookupCommonMeanings(word: string): { pos: string; zh: string }[] {
   return COMMON_DICT[l] || [];
 }
 
-/* ---- 从 Free Dictionary 所有义项构建 meanings 列表 ---- */
+/* ---- 从 Free Dictionary 所有义项构建 meanings 列表（优化版：并行翻译） ---- */
 
 async function buildMeaningsFromFD(word: string, meanings?: FDMeaning[]): Promise<EnrichedMeaning[]> {
   if (!meanings?.length) return [];
+
   const sorted = [...meanings].sort((a, b) => posRank(a.partOfSpeech) - posRank(b.partOfSpeech));
-  const result: EnrichedMeaning[] = [];
+
+  // 第一阶段：收集所有候选义项（最多取前 5 条），预处理去重
+  const candidates: Array<{ pos: string; definition: string; example: string; commonZh: string }> = [];
+  const seen = new Set<string>();
 
   for (const m of sorted) {
     const pos = beautifyPos(m.partOfSpeech || "");
@@ -180,40 +184,46 @@ async function buildMeaningsFromFD(word: string, meanings?: FDMeaning[]): Promis
     for (let i = 0; i < defs.length; i++) {
       const def = defs[i];
       if (!def.definition?.trim()) continue;
+      const key = `${pos}::${def.definition}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
 
-      // 优先从通用词库获取精确中文释义
-      let finalZh = lookupCommon(word, m.partOfSpeech || "");
-      if (!finalZh) {
-        // 词库没有 → 翻译单词本身获取中文
-        const wordTrans = await translate(word);
-        if (def.definition.length > 80 && wordTrans) {
-          finalZh = shortenMeaning(wordTrans);
-        } else {
-          const defZh = await translate(def.definition);
-          finalZh = defZh ? shortenMeaning(defZh) : (wordTrans || shortenMeaning(def.definition));
-        }
-      }
+      // 优先从通用词库获取精确中文，没有则标记为需要翻译
+      const commonZh = lookupCommon(word, m.partOfSpeech || "");
 
-      // 跳过重复释义
-      if (result.some((r) => r.meaningZh === finalZh && r.partOfSpeech === pos)) continue;
-
-      const example = def.example?.trim() || "";
-      let exampleTrans: string | undefined;
-      if (example) {
-        exampleTrans = await translate(example);
-        if (exampleTrans) exampleTrans = cleanTrans(exampleTrans);
-      }
-      if (result.length >= 8) break;
-      result.push({
-        partOfSpeech: pos,
-        meaningZh: finalZh,
-        exampleSentence: example || undefined,
-        exampleTranslation: exampleTrans || undefined,
-        isObscure: i > 0,
-        isHighFreq: false,
+      candidates.push({
+        pos,
+        definition: shortenMeaning(def.definition),
+        example: def.example?.trim() || "",
+        commonZh,
       });
+
+      if (candidates.length >= 5) break;
     }
-    if (result.length >= 8) break;
+    if (candidates.length >= 5) break;
+  }
+
+  // 第二阶段：并行翻译所有需要翻译的义项（不含例句翻译 — 例句翻译延迟大、价值低）
+  const toTranslate = candidates.map((c) => {
+    if (c.commonZh) return Promise.resolve(c.commonZh);
+    return translate(c.definition).then((t) => t || "（翻译失败）");
+  });
+
+  const translations = await Promise.all(toTranslate);
+
+  // 第三阶段：组装结果
+  const result: EnrichedMeaning[] = [];
+  for (let i = 0; i < candidates.length; i++) {
+    const c = candidates[i];
+    const finalZh = c.commonZh || translations[i];
+    result.push({
+      partOfSpeech: c.pos,
+      meaningZh: finalZh,
+      exampleSentence: c.example || undefined,
+      exampleTranslation: undefined, // 例句翻译跳过，大幅减少延迟
+      isObscure: i > 0,
+      isHighFreq: false,
+    });
   }
 
   return result;

@@ -698,6 +698,18 @@ textarea:focus-visible,
   position: relative;
 }
 
+.hero-streak {
+  font-size: var(--text-sm);
+  color: var(--color-warning);
+  margin: 0 0 var(--space-2);
+  opacity: 0.85;
+}
+
+.hero-streak strong {
+  font-weight: var(--font-bold);
+  font-size: var(--text-md);
+}
+
 .hero-btns {
   display: flex;
   gap: 10px;
@@ -972,6 +984,18 @@ textarea:focus-visible,
   background: rgba(254, 226, 226, 0.3);
   border-color: rgba(220, 38, 38, 0.08);
   color: #dc2626;
+}
+
+.home-word-tag.stubborn {
+  border-color: rgba(202, 138, 4, 0.15);
+  background: rgba(254, 250, 239, 0.6);
+  color: var(--color-warning);
+}
+
+.stubborn-badge {
+  margin-left: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
 }
 
 

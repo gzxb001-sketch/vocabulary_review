@@ -4,22 +4,40 @@ import { useState } from "react";
 import { createWorker } from "tesseract.js";
 import { useRouter } from "next/navigation";
 import { useDraftWordStore } from "@/store/draft-words";
+import { extractCandidatesFromRawText } from "@/lib/ocr-cleaner";
 
-function cleanOcrText(rawText: string): string[] {
-  return rawText
-    .split(/\r?\n/)
-    .map((line) => line.replace(/\s+/g, " ").trim())
-    .map((line) =>
-      line
-        .replace(/[|]/g, " ")
-        .replace(/[\\\""\\\""\\\""\x60]/g, "")
-        .replace(/[\uFF0C\u3002\uFF1B\uFF1A\uFF1F\uFF01,.;:!?()[\]{}<>]/g, " ")
-        .replace(/\d+/g, " ")
-        .replace(/\s+/g, " ")
-        .trim()
-    )
-    .filter((text) => text.length >= 2 && /^[A-Za-z][A-Za-z\s-]*[A-Za-z]$/.test(text))
-    .filter((text, i, arr) => arr.map((t) => t.toLowerCase()).indexOf(text.toLowerCase()) === i);
+// 图片预处理：灰度化 + 增强对比度，提高 OCR 准确率
+function preprocessImage(file: File): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0);
+
+      // 获取像素数据
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+
+      // 灰度化 + 对比度增强
+      for (let i = 0; i < data.length; i += 4) {
+        // 加权灰度
+        const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+        // 对比度增强：将亮度向两极推
+        const enhanced = gray < 128 ? gray * 0.8 : Math.min(255, gray * 1.3);
+        data[i] = enhanced;
+        data[i + 1] = enhanced;
+        data[i + 2] = enhanced;
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+      canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("convert failed")), "image/jpeg", 0.9);
+    };
+    img.onerror = () => reject(new Error("image load failed"));
+    img.src = URL.createObjectURL(file);
+  });
 }
 
 export default function CapturePage() {
@@ -35,9 +53,14 @@ export default function CapturePage() {
     if (!file) { setError("请先选择一张图片"); return; }
     setError("");
     setLoading(true);
-    setProgress("正在加载识别引擎...");
+    setProgress("正在预处理图片...");
 
     try {
+      // 图片预处理：灰度化 + 对比度增强
+      setProgress("正在增强图片清晰度...");
+      const processed = await preprocessImage(file);
+
+      setProgress("正在加载识别引擎...");
       const worker = await createWorker("eng", 1, {
         logger: (m: any) => {
           if (m.status === "recognizing text") {
@@ -52,10 +75,10 @@ export default function CapturePage() {
         },
       });
 
-      const { data } = await worker.recognize(file);
+      const { data } = await worker.recognize(processed);
       await worker.terminate();
 
-      const candidates = cleanOcrText(data.text || "");
+      const candidates = extractCandidatesFromRawText(data.text || "");
       const now = Date.now();
 
       if (candidates.length === 0) {
@@ -64,11 +87,14 @@ export default function CapturePage() {
         return;
       }
 
+      // 已校验的词排在前面
+      const sorted = [...candidates].sort((a, b) => (b.isVerified ? 1 : 0) - (a.isVerified ? 1 : 0));
+
       setItems(
-        candidates.map((text, i) => ({
+        sorted.map((item, i) => ({
           tempId: "tmp_" + now + "_" + i,
-          text,
-          selected: true,
+          text: item.text,
+          selected: item.isVerified || i === 0,
           sourceType: "exam" as const,
           imageId: "img_" + now,
         }))

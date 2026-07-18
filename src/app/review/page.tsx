@@ -58,6 +58,9 @@ export default function ReviewPage() {
   const [pendingCount, setPendingCount] = useState(0);
   const [isOffline, setIsOffline] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
+  const [pausing, setPausing] = useState(false);
+  const [pauseCountdown, setPauseCountdown] = useState(3);
+  const [wasEndedEarly, setWasEndedEarly] = useState(false);
 
   const trySync = useCallback(async () => {
     const { remaining } = await syncQueue();
@@ -127,10 +130,10 @@ export default function ReviewPage() {
       const current = items[index];
       if (!current) return;
 
-      // 游客模式：不调 API，直接跳到下一词
+      // 游客模式：不调 API，进入暂停
       if (isDemo) {
-        setRevealed(false);
-        setIndex((prev) => prev + 1);
+        setPausing(true);
+        setPauseCountdown(3);
         return;
       }
 
@@ -152,11 +155,30 @@ export default function ReviewPage() {
       }
 
       setSubmitting(false);
-      setRevealed(false);
-      setIndex((prev) => prev + 1);
+      setPausing(true);
+      setPauseCountdown(3);
     },
     [items, index, trySync, isDemo]
   );
+
+  // 暂停倒计时：3 秒后自动进入下一词
+  useEffect(() => {
+    if (!pausing) return;
+    if (pauseCountdown <= 0) {
+      setPausing(false);
+      setRevealed(false);
+      setIndex((prev) => prev + 1);
+      return;
+    }
+    const timer = setTimeout(() => setPauseCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [pausing, pauseCountdown]);
+
+  // 提前结束本轮
+  function endSession() {
+    setWasEndedEarly(true);
+    setIndex(items.length);
+  }
 
   if (loading) {
     return (
@@ -203,9 +225,13 @@ export default function ReviewPage() {
           </div>
         ) : (
           <div className="card empty-state">
-            <span className="empty-state-icon">🎉</span>
-            <h1 className="empty-state-title">今天复习完成</h1>
-            <p className="empty-state-text">这一轮已经结束，明天再继续。</p>
+            <span className="empty-state-icon">{wasEndedEarly ? "⏸" : "🎉"}</span>
+            <h1 className="empty-state-title">{wasEndedEarly ? "复习已暂停" : "今天复习完成"}</h1>
+            <p className="empty-state-text">
+              {wasEndedEarly
+                ? `已完成 ${items.length > 0 ? Math.min(index, items.length) : 0}/${items.length} 个，剩余的明天继续。`
+                : "这一轮已经结束，明天再继续。"}
+            </p>
             <div className="link-row">
               <Link href="/" className="link-button">返回首页</Link>
             </div>
@@ -291,17 +317,40 @@ export default function ReviewPage() {
 
             <div className="divider" />
 
-            <div className="answer-buttons">
-              <button className="answer-btn known" disabled={submitting} onClick={() => submit("known")}>
-                <span className="answer-emoji">👍</span>认识
-              </button>
-              <button className="answer-btn vague" disabled={submitting} onClick={() => submit("vague")}>
-                <span className="answer-emoji">🤔</span>模糊
-              </button>
-              <button className="answer-btn forgot" disabled={submitting} onClick={() => submit("forgot")}>
-                <span className="answer-emoji">😅</span>不会
-              </button>
-            </div>
+            {pausing ? (
+              <div className="stack" style={{ textAlign: "center" }}>
+                <p className="muted" style={{ fontSize: "var(--text-md)" }}>
+                  已记录 · {pauseCountdown}s 后进入下一词
+                </p>
+                <button
+                  className="button button-secondary"
+                  onClick={() => { setPausing(false); setPauseCountdown(0); }}
+                >
+                  再看一眼
+                </button>
+              </div>
+            ) : (
+              <div className="answer-buttons">
+                <button className="answer-btn known" disabled={submitting} onClick={() => submit("known")}>
+                  <span className="answer-emoji">👍</span>认识
+                </button>
+                <button className="answer-btn vague" disabled={submitting} onClick={() => submit("vague")}>
+                  <span className="answer-emoji">🤔</span>模糊
+                </button>
+                <button className="answer-btn forgot" disabled={submitting} onClick={() => submit("forgot")}>
+                  <span className="answer-emoji">😅</span>不会
+                </button>
+              </div>
+            )}
+
+            {/* 提前结束按钮 */}
+            <button
+              className="button button-secondary"
+              style={{ marginTop: "var(--space-3)", opacity: 0.7 }}
+              onClick={endSession}
+            >
+              提前结束（已完成 {index + 1}/{items.length}）
+            </button>
           </div>
         )}
       </div>
