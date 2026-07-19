@@ -40,6 +40,7 @@ export default function ManualPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [hint, setHint] = useState("");
+  const [synonyms, setSynonyms] = useState<string[]>([]);
 
   async function handleEnrich() {
     if (!displayText.trim()) { setError("请先输入单词或短语"); return; }
@@ -62,6 +63,7 @@ export default function ManualPage() {
       setPartOfSpeech(item.partOfSpeech || "");
       setExampleSentence(item.exampleSentence || "");
       setMeanings(item.meanings || []);
+      setSynonyms(item.synonyms || []);
       if (!item.found) setHint("未查到完整词典结果，已保留基础词形，可手动补充后保存。");
     } finally { setEnriching(false); }
   }
@@ -82,6 +84,7 @@ export default function ManualPage() {
             partOfSpeech: partOfSpeech.trim(),
             exampleSentence: exampleSentence.trim(),
             meanings: meanings.length > 0 ? meanings : undefined,
+            synonyms: synonyms.length > 0 ? synonyms : undefined,
             source: { sourceType, sourceNote: sourceNote.trim() },
           }],
         }),
@@ -184,6 +187,8 @@ export default function ManualPage() {
             <option value="exam">真题</option>
             <option value="reading">阅读</option>
             <option value="lecture">听课</option>
+            <option value="longSentence">长难句</option>
+            <option value="translation">翻译</option>
             <option value="other">其他</option>
           </select>
         </div>

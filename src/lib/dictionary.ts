@@ -38,6 +38,7 @@ export type EnrichedWord = {
   meanings?: EnrichedMeaning[];
   provider: "kaoyan_local" | "free_dictionary" | "free_dictionary_translated" | "smart_fallback" | "fallback";
   found: boolean;
+  synonyms?: string[]; // 来自 Free Dictionary 的同义词
 };
 
 /* ---- 考研真题风格例句生成 ---- */
@@ -80,7 +81,7 @@ function generateExample(w: string, pos: string): string {
 
 /* ---- Free Dictionary Types ---- */
 
-type FDMeaning = { partOfSpeech?: string; definitions?: Array<{ definition?: string; example?: string }> };
+type FDMeaning = { partOfSpeech?: string; definitions?: Array<{ definition?: string; example?: string; synonyms?: string[] }> };
 type FDEntry = { word?: string; phonetic?: string; phonetics?: Array<{ text?: string }>; meanings?: FDMeaning[] };
 type TransRes = { responseData?: { translatedText?: string } };
 
@@ -283,6 +284,20 @@ async function queryFD(text: string): Promise<EnrichedWord | null> {
     const phonetic = pickPhonetic(entry);
     const meanings = await buildMeaningsFromFD(n, entry.meanings);
 
+    // 提取同义词（去重，取前 8 个）
+    const seenSynonyms = new Set<string>();
+    for (const m of entry.meanings || []) {
+      for (const d of m.definitions || []) {
+        for (const s of d.synonyms || []) {
+          const clean = s.trim().toLowerCase();
+          if (clean && clean !== l && !seenSynonyms.has(clean)) {
+            seenSynonyms.add(clean);
+          }
+        }
+      }
+    }
+    const synonyms = Array.from(seenSynonyms).slice(0, 8);
+
     const first = meanings[0];
 
     return {
@@ -293,6 +308,7 @@ async function queryFD(text: string): Promise<EnrichedWord | null> {
       partOfSpeech: first?.partOfSpeech || "",
       exampleSentence: first?.exampleSentence || undefined,
       meanings: meanings.length > 0 ? meanings : undefined,
+      synonyms: synonyms.length > 0 ? synonyms : undefined,
       provider: "free_dictionary_translated",
       found: true,
     };

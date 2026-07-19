@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -18,7 +18,7 @@ export default function CaptureReviewPage() {
   const { items, updateItem, removeItem, clear, addItems } = useDraftWordStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [bulkSourceType, setBulkSourceType] = useState<"exam" | "reading" | "lecture" | "manual" | "other">("exam");
+  const [bulkSourceType, setBulkSourceType] = useState<"exam" | "reading" | "lecture" | "manual" | "longSentence" | "translation" | "other">("exam");
   const [bulkSourceNote, setBulkSourceNote] = useState("");
   const [manualInput, setManualInput] = useState("");
 
@@ -84,6 +84,8 @@ export default function CaptureReviewPage() {
           phonetic: enriched?.phonetic || "",
           partOfSpeech: enriched?.partOfSpeech || "",
           exampleSentence: enriched?.exampleSentence || "",
+          synonyms: enriched?.synonyms || [],
+          meanings: enriched?.meanings || [],
           source: { sourceType: item.sourceType, sourceNote: item.sourceNote || "" },
         };
       });
@@ -131,6 +133,8 @@ export default function CaptureReviewPage() {
                   <option value="reading">阅读</option>
                   <option value="lecture">听课</option>
                   <option value="manual">手动</option>
+                  <option value="longSentence">长难句</option>
+                  <option value="translation">翻译</option>
                   <option value="other">其他</option>
                 </select>
 
@@ -154,6 +158,8 @@ export default function CaptureReviewPage() {
                     <option value="reading">阅读</option>
                     <option value="lecture">听课</option>
                     <option value="manual">手动</option>
+                    <option value="longSentence">长难句</option>
+                    <option value="translation">翻译</option>
                     <option value="other">其他</option>
                   </select>
 

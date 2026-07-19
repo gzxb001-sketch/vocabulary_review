@@ -129,11 +129,8 @@ async function getHomeData(userId: string) {
 }
 
 const SOURCE_LABELS: Record<string, string> = {
-  exam: "真题",
-  reading: "阅读",
-  lecture: "听课",
-  manual: "手动",
-  other: "其他",
+  exam: "真题", reading: "阅读", lecture: "听课", manual: "手动",
+  longSentence: "长难句", translation: "翻译", other: "其他",
 };
 
 export default async function HomePage() {

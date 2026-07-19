@@ -54,7 +54,6 @@ export default function ReviewPage() {
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [isOffline, setIsOffline] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
@@ -129,13 +128,18 @@ export default function ReviewPage() {
       const current = items[index];
       if (!current) return;
 
-      // 游客模式：不调 API，进入暂停
-      if (isDemo) {
-        setPausing(true);
-        return;
+      // 跳过提交动画直接切词，已知/模糊
+      const isForgot = result === "forgot";
+      setRevealed(false);
+      if (!isForgot) {
+        setIndex((prev) => prev + 1);
       }
 
-      setSubmitting(true);
+      // 游客模式：不调 API
+      if (isDemo) {
+        if (isForgot) setPausing(true);
+        return;
+      }
 
       try {
         const res = await fetch("/api/review/submit", {
@@ -146,24 +150,28 @@ export default function ReviewPage() {
         if (!res.ok) throw new Error("submit failed");
         setIsOffline(false);
       } catch {
-        // 离线：加入同步队列
         await enqueueSubmit({ wordId: current.wordId, result });
         setIsOffline(true);
         await trySync();
       }
 
-      setSubmitting(false);
-      setPausing(true);
+      // 忘了：提交完成后展示「再看看」
+      if (isForgot) {
+        setPausing(true);
+      }
     },
     [items, index, trySync, isDemo]
   );
 
-  // 直接进入下一词
-  function nextWord() {
-    setPausing(false);
-    setRevealed(false);
-    setIndex((prev) => prev + 1);
-  }
+  // 2 秒后自动进入下一词（仅「不会」场景）
+  useEffect(() => {
+    if (!pausing) return;
+    const timer = setTimeout(() => {
+      setPausing(false);
+      setIndex((prev) => prev + 1);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [pausing]);
 
   // 提前结束本轮
   function endSession() {
@@ -310,30 +318,22 @@ export default function ReviewPage() {
 
             {pausing ? (
               <div className="stack" style={{ textAlign: "center" }}>
-                <p className="muted" style={{ fontSize: "var(--text-md)", marginBottom: "var(--space-3)" }}>
-                  已记录
+                <p className="muted" style={{ fontSize: "var(--text-md)", marginBottom: "var(--space-2)" }}>
+                  已标记为「不会」，2s 后进入下一词
                 </p>
-                <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "center" }}>
-                  <button className="button" onClick={nextWord}>
-                    下一词
-                  </button>
-                  <button
-                    className="button button-secondary"
-                    onClick={() => setPausing(false)}
-                  >
-                    再看一眼
-                  </button>
-                </div>
+                <button className="button button-secondary" onClick={() => { setPausing(false); setIndex((prev) => prev + 1); }}>
+                  再看一眼
+                </button>
               </div>
             ) : (
               <div className="answer-buttons">
-                <button className="answer-btn known" disabled={submitting} onClick={() => submit("known")}>
+                <button className="answer-btn known" onClick={() => submit("known")}>
                   <span className="answer-emoji">👍</span>认识
                 </button>
-                <button className="answer-btn vague" disabled={submitting} onClick={() => submit("vague")}>
+                <button className="answer-btn vague" onClick={() => submit("vague")}>
                   <span className="answer-emoji">🤔</span>模糊
                 </button>
-                <button className="answer-btn forgot" disabled={submitting} onClick={() => submit("forgot")}>
+                <button className="answer-btn forgot" onClick={() => submit("forgot")}>
                   <span className="answer-emoji">😅</span>不会
                 </button>
               </div>

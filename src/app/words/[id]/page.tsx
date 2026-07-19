@@ -10,8 +10,19 @@ const SOURCE_LABELS: Record<string, string> = {
   reading: "阅读",
   lecture: "听课",
   manual: "手动",
+  longSentence: "长难句",
+  translation: "翻译",
   other: "其他",
 };
+
+function parseSynonyms(note?: string | null): string[] {
+  if (!note) return [];
+  try {
+    const parsed = JSON.parse(note);
+    if (Array.isArray(parsed) && parsed.every((s) => typeof s === "string")) return parsed;
+  } catch {}
+  return [];
+}
 
 const RESULT_LABELS: Record<string, string> = {
   known: "认识",
@@ -172,6 +183,25 @@ export default async function WordDetailPage({
       />
 
       <div className="page-block" />
+
+      {/* Synonyms */}
+      {(() => {
+        const syns = parseSynonyms(word.note);
+        if (!syns.length) return null;
+        return (
+          <>
+            <div className="card stack">
+              <h2 className="section-title">近义词</h2>
+              <div className="home-tag-cloud">
+                {syns.map((s) => (
+                  <span key={s} className="home-word-tag">{s}</span>
+                ))}
+              </div>
+            </div>
+            <div className="page-block" />
+          </>
+        );
+      })()}
 
       {/* Review Schedule */}
       <div className="card stack">

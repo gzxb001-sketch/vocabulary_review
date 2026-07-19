@@ -20,6 +20,7 @@ type SaveWordInput = {
   partOfSpeech?: string;
   exampleSentence?: string;
   note?: string;
+  synonyms?: string[];
   meanings?: MeaningInput[];
   source: {
     sourceType: "exam" | "reading" | "lecture" | "manual" | "other";
@@ -28,6 +29,11 @@ type SaveWordInput = {
     imageId?: string;
   };
 };
+
+function encodeSynonyms(synonyms?: string[]): string | null {
+  if (!synonyms?.length) return null;
+  return JSON.stringify(synonyms);
+}
 
 export async function POST(req: NextRequest) {
   let userId: string;
@@ -88,6 +94,7 @@ export async function POST(req: NextRequest) {
           }));
 
         // 批量写入：合并 word.update + source.create + meaning creates
+        const synNote = encodeSynonyms(item.synonyms);
         await prisma.$transaction([
           prisma.word.update({
             where: { id: existingWord.id },
@@ -96,7 +103,7 @@ export async function POST(req: NextRequest) {
               phonetic: existingWord.phonetic || item.phonetic,
               partOfSpeech: existingWord.partOfSpeech || item.partOfSpeech,
               exampleSentence: existingWord.exampleSentence || item.exampleSentence,
-              note: existingWord.note || item.note,
+              note: synNote || existingWord.note || item.note,
             },
           }),
           prisma.wordSource.create({
@@ -126,6 +133,7 @@ export async function POST(req: NextRequest) {
       ).filter((m) => m.meaningZh);
 
       const newWordId = crypto.randomUUID();
+      const synNote = encodeSynonyms(item.synonyms);
 
       await prisma.$transaction([
         prisma.word.create({
@@ -138,7 +146,7 @@ export async function POST(req: NextRequest) {
             phonetic: item.phonetic,
             partOfSpeech: item.partOfSpeech,
             exampleSentence: item.exampleSentence,
-            note: item.note,
+            note: synNote || item.note,
           },
         }),
         prisma.reviewSchedule.create({
