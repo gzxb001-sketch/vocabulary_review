@@ -28,6 +28,7 @@ type ReviewItem = {
   sourceType?: string | null;
   sourceNote?: string | null;
   meanings?: ReviewMeaning[];
+  synonyms?: string[];
 };
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -311,6 +312,15 @@ export default function ReviewPage() {
                   <span className="meta-chip">来源：{SOURCE_LABELS[current.sourceType] || current.sourceType}</span>
                 )}
                 {current.sourceNote && <span className="muted">{current.sourceNote}</span>}
+              </div>
+            )}
+
+            {current.synonyms && current.synonyms.length > 0 && (
+              <div className="review-synonyms">
+                <span className="muted" style={{ fontSize: "var(--text-xs)" }}>近义词：</span>
+                {current.synonyms.map((s) => (
+                  <span key={s} className="synonym-chip">{s}</span>
+                ))}
               </div>
             )}
 

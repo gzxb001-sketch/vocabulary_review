@@ -170,6 +170,18 @@ export default function ManualPage() {
           </div>
         )}
 
+        {/* 同义词预览 */}
+        {synonyms.length > 0 && (
+          <div style={{ marginTop: "var(--space-2)" }}>
+            <label className="label">近义词</label>
+            <div className="home-tag-cloud">
+              {synonyms.map((s) => (
+                <span key={s} className="home-word-tag">{s}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div>
           <label className="label">最短中文义</label>
           <input className="input" placeholder="如在列表中快速展示的意思" value={meaningZh} onChange={(e) => setMeaningZh(e.target.value)} />

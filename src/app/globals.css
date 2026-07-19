@@ -998,6 +998,24 @@ textarea:focus-visible,
   color: var(--color-text-muted);
 }
 
+.review-synonyms {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: var(--space-2);
+}
+
+.synonym-chip {
+  display: inline-block;
+  font-size: var(--text-xs);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: rgba(59, 130, 246, 0.08);
+  color: var(--color-primary);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+}
+
 
 
 /* ============================================================
