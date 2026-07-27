@@ -18,6 +18,7 @@ export default function CaptureReviewPage() {
   const { items, updateItem, removeItem, clear, addItems } = useDraftWordStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [hint, setHint] = useState("");
   const [bulkSourceType, setBulkSourceType] = useState<"exam" | "reading" | "lecture" | "manual" | "longSentence" | "translation" | "other">("exam");
   const [bulkSourceNote, setBulkSourceNote] = useState("");
   const [manualInput, setManualInput] = useState("");
@@ -103,8 +104,8 @@ export default function CaptureReviewPage() {
       }
 
       clear();
-      router.push("/");
       router.refresh();
+      setHint("已保存！可继续录入。");
     } finally {
       setLoading(false);
     }
@@ -199,6 +200,7 @@ export default function CaptureReviewPage() {
         )}
 
         {error ? <p className="muted" style={{ color: "#dc2626" }}>{error}</p> : null}
+        {hint && !error ? <p className="muted" style={{ color: "#16a34a" }}>{hint}</p> : null}
 
         <button className="button" onClick={handleEnrichAndSave} disabled={loading || items.length === 0}>
           {loading ? "处理中..." : "自动补全并保存"}

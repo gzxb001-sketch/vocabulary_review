@@ -94,7 +94,12 @@ export default function ManualPage() {
         setError(data.detail || data.message || "保存失败，请稍后重试");
         return;
       }
-      router.push("/"); router.refresh();
+      router.refresh();
+      // 清空表单，留在当前页继续录入
+      setDisplayText(""); setLemma(""); setMeaningZh(""); setPhonetic("");
+      setPartOfSpeech(""); setExampleSentence(""); setMeanings([]);
+      setSynonyms([]); setSourceNote("");
+      setHint("已保存！可继续录入下一个词。");
     } finally { setSaving(false); }
   }
 
