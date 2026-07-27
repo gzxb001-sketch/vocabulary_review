@@ -60,6 +60,7 @@ export default function ReviewPage() {
   const [isDemo, setIsDemo] = useState(false);
   const [pausing, setPausing] = useState(false);
   const [wasEndedEarly, setWasEndedEarly] = useState(false);
+  const [sessionResults, setSessionResults] = useState<{ known: number; vague: number; forgot: number }>({ known: 0, vague: 0, forgot: 0 });
 
   const trySync = useCallback(async () => {
     const { remaining } = await syncQueue();
@@ -128,6 +129,9 @@ export default function ReviewPage() {
     async (result: "known" | "vague" | "forgot") => {
       const current = items[index];
       if (!current) return;
+
+      // 记录本轮结果
+      setSessionResults((prev) => ({ ...prev, [result]: prev[result] + 1 }));
 
       // 跳过提交动画直接切词，已知/模糊
       const isForgot = result === "forgot";
@@ -224,16 +228,32 @@ export default function ReviewPage() {
             </div>
           </div>
         ) : (
-          <div className="card empty-state">
+          <div className="card stack review-summary" style={{ textAlign: "center" }}>
             <span className="empty-state-icon">{wasEndedEarly ? "⏸" : "🎉"}</span>
             <h1 className="empty-state-title">{wasEndedEarly ? "复习已暂停" : "今天复习完成"}</h1>
             <p className="empty-state-text">
               {wasEndedEarly
-                ? `已完成 ${items.length > 0 ? Math.min(index, items.length) : 0}/${items.length} 个，剩余的明天继续。`
-                : "这一轮已经结束，明天再继续。"}
+                ? `已完成 ${items.length > 0 ? Math.min(index, items.length) : 0}/${items.length} 个`
+                : `共复习 ${items.length} 个词`}
             </p>
+            {(sessionResults.known > 0 || sessionResults.vague > 0 || sessionResults.forgot > 0) && (
+              <div className="review-summary-row">
+                <div className="review-summary-chip" style={{ background: "rgba(22,163,74,0.08)", color: "#16a34a" }}>
+                  👍 认识 {sessionResults.known}
+                </div>
+                <div className="review-summary-chip" style={{ background: "rgba(202,138,4,0.08)", color: "#ca8a04" }}>
+                  🤔 模糊 {sessionResults.vague}
+                </div>
+                <div className="review-summary-chip" style={{ background: "rgba(220,38,38,0.08)", color: "#dc2626" }}>
+                  😅 不会 {sessionResults.forgot}
+                </div>
+              </div>
+            )}
             <div className="link-row">
               <Link href="/" className="link-button">返回首页</Link>
+              {!wasEndedEarly && (
+                <Link href="/manual" className="link-button secondary">继续录词</Link>
+              )}
             </div>
           </div>
         )}

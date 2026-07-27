@@ -325,6 +325,30 @@ function buildFallback(text: string): EnrichedWord {
   return { text: n, lemma: l, provider: "fallback", found: false };
 }
 
+function buildCommonFallback(text: string): EnrichedWord {
+  const n = normalizeText(text);
+  const l = normalizeLemma(n);
+  const commonMeanings = lookupCommonMeanings(n);
+  if (commonMeanings.length > 0) {
+    const first = commonMeanings[0];
+    return {
+      text: n, lemma: l,
+      meaningZh: first.zh,
+      partOfSpeech: first.pos,
+      phonetic: "",
+      provider: "kaoyan_local",
+      found: true,
+      meanings: commonMeanings.map((m) => ({
+        partOfSpeech: m.pos,
+        meaningZh: m.zh,
+        isObscure: false,
+        isHighFreq: false,
+      })),
+    };
+  }
+  return buildFallback(text);
+}
+
 /* ---- Public API ---- */
 
 export async function enrichWord(text: string): Promise<EnrichedWord> {
@@ -332,10 +356,10 @@ export async function enrichWord(text: string): Promise<EnrichedWord> {
   if (local) return local;
   const remote = await queryFD(text);
   if (remote && remote.found) return remote;
-  return buildFallback(text);
+  return buildCommonFallback(text);
 }
 
 export async function enrichWords(texts: string[]): Promise<EnrichedWord[]> {
   const unique = Array.from(new Set(texts.map((t) => normalizeText(t)).filter(Boolean)));
-  return Promise.all(unique.map((t) => enrichWord(t).catch(() => buildFallback(t))));
+  return Promise.all(unique.map((t) => enrichWord(t).catch(() => buildCommonFallback(t))));
 }

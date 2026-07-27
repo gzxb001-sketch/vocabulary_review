@@ -284,6 +284,32 @@ export default async function HomePage() {
         </section>
       )}
 
+      {/* 新用户引导 */}
+      {!isGuest && data.totalWordsCount === 0 && (
+        <section className="onboarding card stack" style={{ textAlign: "center" }}>
+          <h2 className="section-title">快速开始</h2>
+          <div style={{ display: "flex", gap: "var(--space-4)", justifyContent: "center", flexWrap: "wrap" }}>
+            <div className="onboarding-step">
+              <span className="onboarding-num">1</span>
+              <p>手动录词<br />或拍照识别</p>
+            </div>
+            <div className="onboarding-arrow">→</div>
+            <div className="onboarding-step">
+              <span className="onboarding-num">2</span>
+              <p>自动补全<br />词义与例句</p>
+            </div>
+            <div className="onboarding-arrow">→</div>
+            <div className="onboarding-step">
+              <span className="onboarding-num">3</span>
+              <p>每日复习<br />科学间隔记忆</p>
+            </div>
+          </div>
+          <p className="muted" style={{ marginTop: "var(--space-3)", fontSize: "var(--text-sm)" }}>
+            录入 5 个词后，统计卡片将自动激活
+          </p>
+        </section>
+      )}
+
       {/* 竹节分隔 */}
       <div className="bamboo-divider">
         <span className="bamboo-divider-icon" />
