@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getUserIdFromCookies } from "@/lib/auth";
+import { WeeklyTrendChart } from "./weekly-trend-chart";
 import LogoutButton from "./ui/logout-button";
 import { DEMO_WORDS } from "@/lib/demo-words";
 
@@ -339,6 +340,9 @@ export default async function HomePage() {
           </div>
         </section>
       )}
+
+      {/* 学习趋势图（仅登录用户） */}
+      {!isGuest && <WeeklyTrendChart />}
 
       {/* 最近 */}
       {isGuest ? (

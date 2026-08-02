@@ -286,7 +286,24 @@ export default function ReviewPage() {
           </div>
         )}
 
-        <h1 className="flashcard-word">{current.displayText}</h1>
+        <h1 className="flashcard-word" style={{ position: "relative" }}>
+          {current.displayText}
+          <Link
+            href={`/words/${current.wordId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              fontSize: "var(--text-sm)",
+              color: "var(--color-text-muted)",
+              marginLeft: "var(--space-2)",
+              textDecoration: "none",
+              opacity: 0.5,
+            }}
+            title="查看详情"
+          >
+            📖
+          </Link>
+        </h1>
 
         {!revealed ? (
           <button className="button" onClick={() => setRevealed(true)} style={{ marginTop: "var(--space-4)" }}>

@@ -38,6 +38,7 @@ export async function GET() {
       streak,
       wordCount,
       dueCount,
+      weeklyTrend: await getWeeklyTrend(userId, now),
     });
   } catch {
     return NextResponse.json({
@@ -46,6 +47,7 @@ export async function GET() {
       streak: 0,
       wordCount: 0,
       dueCount: 0,
+      weeklyTrend: [],
     });
   }
 }
@@ -90,4 +92,37 @@ async function calculateStreak(
   }
 
   return streak;
+}
+
+// 近 8 周每周趋势
+async function getWeeklyTrend(
+  userId: string,
+  now: Date,
+): Promise<{ label: string; knownRate: number; total: number }[]> {
+  const trend: { label: string; knownRate: number; total: number }[] = [];
+
+  for (let w = 7; w >= 0; w--) {
+    const weekEnd = new Date(now.getTime() - w * 7 * 24 * 60 * 60 * 1000);
+    const weekStart = new Date(weekEnd.getTime() - 6 * 24 * 60 * 60 * 1000);
+    weekStart.setHours(0, 0, 0, 0);
+    weekEnd.setHours(23, 59, 59, 999);
+
+    const reviews = await prisma.review.groupBy({
+      by: ["reviewResult"],
+      where: { userId, reviewedAt: { gte: weekStart, lte: weekEnd } },
+      _count: { reviewResult: true },
+    });
+
+    const total = reviews.reduce((s, r) => s + r._count.reviewResult, 0);
+    const known = reviews.find((r) => r.reviewResult === "known")?._count.reviewResult ?? 0;
+    const knownRate = total > 0 ? Math.round((known / total) * 100) : -1;
+
+    trend.push({
+      label: `${weekStart.getMonth() + 1}/${weekStart.getDate()}`,
+      knownRate,
+      total,
+    });
+  }
+
+  return trend;
 }

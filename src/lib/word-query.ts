@@ -1,6 +1,6 @@
 import { Prisma, SourceType } from "@prisma/client";
 
-export const SOURCE_FILTERS = ["exam", "reading", "lecture", "manual", "other"] as const;
+export const SOURCE_FILTERS = ["exam", "reading", "lecture", "manual", "longSentence", "translation", "other"] as const;
 export const WORD_SORTS = ["created_desc", "created_asc", "review_asc", "alpha_asc"] as const;
 
 export type WordFilter = "all" | "due" | (typeof SOURCE_FILTERS)[number];

@@ -12,7 +12,7 @@ type WordItem = {
   sourceType?: string | null;
 };
 
-type FilterValue = "all" | "due" | "exam" | "reading" | "lecture" | "manual" | "other";
+type FilterValue = "all" | "due" | "exam" | "reading" | "lecture" | "manual" | "longSentence" | "translation" | "other";
 type SortValue = "created_desc" | "created_asc" | "review_asc" | "alpha_asc";
 
 export default function WordsPage() {
