@@ -49,20 +49,10 @@ export default function CapturePage() {
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
 
-  type VisionCandidate = { text: string; isMarked?: boolean; sourceContext?: string };
+  type Candidate = { text: string; isMarked?: boolean; sourceContext?: string };
 
-  // 优先使用 DeepSeek 视觉识别（可识别红笔标注的生词）
-  async function recognizeWithVision(file: File): Promise<VisionCandidate[]> {
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await fetch("/api/ocr/vision", { method: "POST", body: formData });
-    if (!res.ok) throw new Error("vision unavailable");
-    const data = await res.json();
-    return (data.candidates || []) as VisionCandidate[];
-  }
-
-  // 将识别出的候选词写入草稿，红笔标注词默认勾选，并进入校对页
-  function applyCandidates(candidates: VisionCandidate[], now: number) {
+  // 将识别出的候选词写入草稿，标记词默认勾选，并进入校对页
+  function applyCandidates(candidates: Candidate[], now: number) {
     if (candidates.length === 0) {
       setError("未识别到英文单词，请确认图片中包含清晰的英文文本。");
       return;
@@ -81,7 +71,7 @@ export default function CapturePage() {
     router.push("/capture-review");
   }
 
-  // 本地 Tesseract 兜底：AI 不可用（未登录/无 key/网络故障）时降级
+  // 本地 Tesseract 识别
   async function recognizeWithTesseract(file: File) {
     setProgress("正在增强图片清晰度...");
     const processed = await preprocessImage(file);
@@ -121,14 +111,7 @@ export default function CapturePage() {
     setLoading(true);
 
     try {
-      try {
-        setProgress("正在用 AI 识别图片（可识别红笔标注）...");
-        const candidates = await recognizeWithVision(file);
-        applyCandidates(candidates, Date.now());
-      } catch {
-        setProgress("AI 识别不可用，切换本地识别...");
-        await recognizeWithTesseract(file);
-      }
+      await recognizeWithTesseract(file);
     } catch (e: any) {
       setError("识别失败：" + (e.message || "未知错误"));
     } finally {

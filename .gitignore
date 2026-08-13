@@ -2,8 +2,8 @@ node_modules
 .next
 coverage
 *.log
-.env
-.env.local
+.env*
+!.env.example
 dev.db
 dev.db-journal
 prisma/dev.db
