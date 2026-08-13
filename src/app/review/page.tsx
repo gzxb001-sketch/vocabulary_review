@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import SpeakButton from "../ui/speak-button";
 import {
   saveReviewItems,
   getCachedReviewItems,
@@ -503,6 +504,9 @@ export default function ReviewPage() {
 
         <h1 className="flashcard-word" style={{ position: "relative" }}>
           {current.displayText}
+          <span style={{ marginLeft: "var(--space-2)" }}>
+            <SpeakButton text={current.displayText} />
+          </span>
           <Link
             href={`/words/${current.wordId}`}
             target="_blank"
@@ -579,6 +583,21 @@ export default function ReviewPage() {
               {current.sourceContext && (
                 <p className="review-context">&ldquo;{current.sourceContext}&rdquo;</p>
               )}
+
+              {(() => {
+                const top = current.exampleSentence;
+                const meaningEx = (current.meanings || []).find((m) => m.exampleSentence);
+                const example = top || meaningEx?.exampleSentence;
+                if (!example) return null;
+                return (
+                  <div className="review-example">
+                    <p className="review-example-en">{example}</p>
+                    {meaningEx?.exampleTranslation && (
+                      <p className="review-example-zh">{meaningEx.exampleTranslation}</p>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* 完整义项列表 */}
               {(current.meanings || []).length > 0 && (

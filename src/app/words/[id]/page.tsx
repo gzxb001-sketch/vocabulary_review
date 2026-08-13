@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getUserIdFromCookies } from "@/lib/auth";
 import WordActions from "./word-actions";
+import SpeakButton from "../../ui/speak-button";
 
 export const dynamic = "force-dynamic";
 
@@ -67,7 +68,12 @@ export default async function WordDetailPage({
     <main className="container fade-in">
       {/* Word Header */}
       <div className="card stack">
-        <h1 className="word-display">{word.displayText}</h1>
+        <h1 className="word-display">
+          {word.displayText}
+          <span style={{ marginLeft: "var(--space-2)" }}>
+            <SpeakButton text={word.displayText} />
+          </span>
+        </h1>
         {word.meaningZh && <p className="word-meaning">{word.meaningZh}</p>}
         {word.phonetic && <p className="word-phonetic">{word.phonetic}</p>}
         {word.note && <p className="muted">备注：{word.note}</p>}
