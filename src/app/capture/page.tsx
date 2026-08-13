@@ -49,59 +49,86 @@ export default function CapturePage() {
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
 
+  type VisionCandidate = { text: string; isMarked?: boolean; sourceContext?: string };
+
+  // 优先使用 DeepSeek 视觉识别（可识别红笔标注的生词）
+  async function recognizeWithVision(file: File): Promise<VisionCandidate[]> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch("/api/ocr/vision", { method: "POST", body: formData });
+    if (!res.ok) throw new Error("vision unavailable");
+    const data = await res.json();
+    return (data.candidates || []) as VisionCandidate[];
+  }
+
+  // 将识别出的候选词写入草稿，红笔标注词默认勾选，并进入校对页
+  function applyCandidates(candidates: VisionCandidate[], now: number) {
+    if (candidates.length === 0) {
+      setError("未识别到英文单词，请确认图片中包含清晰的英文文本。");
+      return;
+    }
+    const sorted = [...candidates].sort((a, b) => (b.isMarked ? 1 : 0) - (a.isMarked ? 1 : 0));
+    setItems(
+      sorted.map((item, i) => ({
+        tempId: "tmp_" + now + "_" + i,
+        text: item.text,
+        selected: item.isMarked || i === 0,
+        sourceType: "exam" as const,
+        sourceContext: item.sourceContext,
+        imageId: "img_" + now,
+      }))
+    );
+    router.push("/capture-review");
+  }
+
+  // 本地 Tesseract 兜底：AI 不可用（未登录/无 key/网络故障）时降级
+  async function recognizeWithTesseract(file: File) {
+    setProgress("正在增强图片清晰度...");
+    const processed = await preprocessImage(file);
+
+    setProgress("正在加载识别引擎...");
+    const worker = await createWorker("eng", 1, {
+      logger: (m: any) => {
+        if (m.status === "recognizing text") {
+          setProgress("识别中... " + Math.round((m.progress || 0) * 100) + "%");
+        } else if (m.status === "loading tesseract core") {
+          setProgress("加载核心引擎...");
+        } else if (m.status === "loading language traineddata") {
+          setProgress("下载英文语言包...");
+        } else if (m.status === "initializing tesseract") {
+          setProgress("初始化识别...");
+        }
+      },
+    });
+
+    const { data } = await worker.recognize(processed);
+    await worker.terminate();
+
+    const candidates = extractCandidatesFromRawText(data.text || "");
+    applyCandidates(
+      candidates.map((item) => ({
+        text: item.text,
+        isMarked: item.isVerified,
+        sourceContext: item.sourceContext,
+      })),
+      Date.now(),
+    );
+  }
+
   async function handleOcr() {
     if (!file) { setError("请先选择一张图片"); return; }
     setError("");
     setLoading(true);
-    setProgress("正在预处理图片...");
 
     try {
-      // 图片预处理：灰度化 + 对比度增强
-      setProgress("正在增强图片清晰度...");
-      const processed = await preprocessImage(file);
-
-      setProgress("正在加载识别引擎...");
-      const worker = await createWorker("eng", 1, {
-        logger: (m: any) => {
-          if (m.status === "recognizing text") {
-            setProgress("识别中... " + Math.round((m.progress || 0) * 100) + "%");
-          } else if (m.status === "loading tesseract core") {
-            setProgress("加载核心引擎...");
-          } else if (m.status === "loading language traineddata") {
-            setProgress("下载英文语言包...");
-          } else if (m.status === "initializing tesseract") {
-            setProgress("初始化识别...");
-          }
-        },
-      });
-
-      const { data } = await worker.recognize(processed);
-      await worker.terminate();
-
-      const candidates = extractCandidatesFromRawText(data.text || "");
-      const now = Date.now();
-
-      if (candidates.length === 0) {
-        setError("未识别到英文单词，请确认图片中包含清晰的英文文本。");
-        setLoading(false);
-        return;
+      try {
+        setProgress("正在用 AI 识别图片（可识别红笔标注）...");
+        const candidates = await recognizeWithVision(file);
+        applyCandidates(candidates, Date.now());
+      } catch {
+        setProgress("AI 识别不可用，切换本地识别...");
+        await recognizeWithTesseract(file);
       }
-
-      // 已校验的词排在前面
-      const sorted = [...candidates].sort((a, b) => (b.isVerified ? 1 : 0) - (a.isVerified ? 1 : 0));
-
-      setItems(
-        sorted.map((item, i) => ({
-          tempId: "tmp_" + now + "_" + i,
-          text: item.text,
-          selected: item.isVerified || i === 0,
-          sourceType: "exam" as const,
-          sourceContext: item.sourceContext,
-          imageId: "img_" + now,
-        }))
-      );
-
-      router.push("/capture-review");
     } catch (e: any) {
       setError("识别失败：" + (e.message || "未知错误"));
     } finally {
