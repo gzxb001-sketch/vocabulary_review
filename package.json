@@ -20,17 +20,21 @@
     "bcryptjs": "^3.0.3",
     "jose": "^6.2.3",
     "next": "^16.2.10",
+    "nodemailer": "^9.0.5",
     "prisma": "^6.16.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "tesseract.js": "^7.0.0",
+    "web-push": "^3.6.7",
     "zod": "^4.4.3",
     "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
+    "@types/nodemailer": "^8.0.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@types/web-push": "^3.6.4",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.10",
     "typescript": "^6.0.3"

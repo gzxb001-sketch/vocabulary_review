@@ -32,11 +32,16 @@ model User {
   passwordHash String
   createdAt    DateTime @default(now())
 
+  emailReminderEnabled Boolean @default(false)
+  emailReminderHour    Int     @default(20)
+  emailReminderMinute  Int     @default(0)
+
   words         Word[]
   sources       WordSource[]
   meanings      Meaning[]
   reviews       Review[]
   reviewSchedule ReviewSchedule[]
+  pushSubscriptions PushSubscription[]
 }
 
 model Word {
@@ -141,10 +146,29 @@ model Review {
   reviewedAt     DateTime     @default(now())
   intervalBefore Int?
   intervalAfter  Int?
+  clientResultId String?      @unique
 
   word           Word         @relation(fields: [wordId], references: [id], onDelete: Cascade)
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([wordId, reviewedAt])
   @@index([userId])
+}
+
+model PushSubscription {
+  id           String   @id @default(cuid())
+  userId       String
+  endpoint     String   @unique
+  p256dh       String
+  auth         String
+  remindHour   Int      @default(20)
+  remindMinute Int      @default(0)
+  timezone     String   @default("Asia/Shanghai")
+  enabled      Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([enabled])
 }

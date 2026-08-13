@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { migrateDraftWords } from "@/lib/draft-migrate";
 
 export default function LoginPage() {
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -46,6 +47,11 @@ export default function LoginPage() {
         setError(data.message || "操作失败");
         return;
       }
+
+      // 登录/注册成功后，迁移游客时期录入的草稿词到账号（失败不阻塞登录）
+      try {
+        await migrateDraftWords();
+      } catch {}
 
       window.location.href = "/";
     } catch {

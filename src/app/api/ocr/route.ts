@@ -29,6 +29,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("ocr failed", error);
-    return NextResponse.json({ message: "ocr failed" }, { status: 500 });
+    return NextResponse.json(
+      { message: "识别失败，请重新拍摄清晰照片，或改用「手动录入」" },
+      { status: 500 }
+    );
   }
 }

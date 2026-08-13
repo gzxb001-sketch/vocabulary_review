@@ -87,7 +87,7 @@ export default function CaptureReviewPage() {
           exampleSentence: enriched?.exampleSentence || "",
           synonyms: enriched?.synonyms || [],
           meanings: enriched?.meanings || [],
-          source: { sourceType: item.sourceType, sourceNote: item.sourceNote || "" },
+          source: { sourceType: item.sourceType, sourceNote: item.sourceNote || "", sourceContext: item.sourceContext },
         };
       });
 

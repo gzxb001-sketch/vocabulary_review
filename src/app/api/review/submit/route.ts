@@ -6,6 +6,7 @@ import { requireUserId, authError } from "@/lib/api-auth";
 type SubmitBody = {
   wordId: string;
   result: "known" | "vague" | "forgot";
+  clientResultId?: string;
 };
 
 export async function POST(req: NextRequest) {
@@ -17,6 +18,16 @@ export async function POST(req: NextRequest) {
 
     if (!body.wordId || !body.result) {
       return NextResponse.json({ message: "invalid params" }, { status: 400 });
+    }
+
+    // 幂等保护：同一 clientResultId 的重复提交直接返回成功，不重复计分/推进调度
+    if (body.clientResultId) {
+      const existing = await prisma.review.findUnique({
+        where: { clientResultId: body.clientResultId },
+      });
+      if (existing) {
+        return NextResponse.json({ ok: true, duplicate: true });
+      }
     }
 
     const schedule = await prisma.reviewSchedule.findFirst({
@@ -37,7 +48,7 @@ export async function POST(req: NextRequest) {
       body.result,
     );
 
-    await Promise.all([
+    await prisma.$transaction([
       prisma.review.create({
         data: {
           wordId: body.wordId,
@@ -45,6 +56,7 @@ export async function POST(req: NextRequest) {
           reviewResult: body.result,
           intervalBefore: schedule.intervalDays,
           intervalAfter: next.intervalDays,
+          clientResultId: body.clientResultId || null,
         },
       }),
       prisma.reviewSchedule.update({

@@ -53,14 +53,11 @@ async function runTesseractOcr(fileBuffer: Buffer): Promise<OcrResult> {
 }
 
 export async function runOcr(fileBuffer: Buffer): Promise<OcrResult> {
+  // 仅显式指定 mock 时才使用假数据（本地开发/联调用）
   if (process.env.OCR_PROVIDER === "mock") {
     return runMockOcr();
   }
 
-  try {
-    return await runTesseractOcr(fileBuffer);
-  } catch (error) {
-    console.error("tesseract ocr failed, fallback to mock", error);
-    return runMockOcr();
-  }
+  // 失败时向上抛出，由调用方返回明确错误，绝不静默回退到硬编码假数据
+  return runTesseractOcr(fileBuffer);
 }

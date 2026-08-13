@@ -63,9 +63,23 @@ function isKnownWord(word: string): boolean {
   return COMMON_DICT[word.toLowerCase()] !== undefined;
 }
 
+/** 从原始 OCR 文本中，查找包含指定单词的那一行，作为复习时的上下文出处 */
+function extractContext(rawText: string, word: string): string | undefined {
+  const lines = rawText.split(/\r?\n/).map((l) => normalizeSpaces(l)).filter(Boolean);
+  const escapedWord = word.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  for (const line of lines) {
+    const regex = new RegExp(`\\b${escapedWord}\\b`, "i");
+    if (regex.test(line) && line.length > word.length + 3) {
+      return line.length > 200 ? line.slice(0, 197) + "..." : line;
+    }
+  }
+  return undefined;
+}
+
 export type OcrCleanResult = {
   text: string;
   isVerified: boolean; // true = 在通用词库中找到，准确性高
+  sourceContext?: string; // 原句中包含该单词的那行文本
 };
 
 export function extractCandidatesFromRawText(rawText: string): OcrCleanResult[] {
@@ -85,6 +99,7 @@ export function extractCandidatesFromRawText(rawText: string): OcrCleanResult[] 
     return {
       text: corrected,
       isVerified: isKnownWord(corrected),
+      sourceContext: extractContext(rawText, corrected),
     };
   });
 }

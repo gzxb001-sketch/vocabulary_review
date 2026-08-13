@@ -24,6 +24,20 @@ export default function WordsPage() {
   const [filter, setFilter] = useState<FilterValue>("all");
   const [sort, setSort] = useState<SortValue>("created_desc");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [hint, setHint] = useState("");
+
+  async function handleAddToReview(wordId: string, displayText: string) {
+    try {
+      const res = await fetch(`/api/words/${wordId}/review-now`, { method: "PATCH" });
+      if (res.ok) {
+        setHint(`「${displayText}」已加入今日复习`);
+      } else {
+        setHint("操作失败，请重试");
+      }
+    } catch {
+      setHint("网络错误，请重试");
+    }
+  }
 
   const exportHref = `/api/words/export?${new URLSearchParams({
     q: query,
@@ -200,6 +214,7 @@ export default function WordsPage() {
           </button>
           <p className="muted">适合 OCR 批量导入后快速清理无效词条，点击词条标题仍可进入详情页。</p>
           {error ? <p className="muted">{error}</p> : null}
+          {hint ? <p className="muted" style={{ color: "var(--color-success)" }}>{hint}</p> : null}
         </div>
 
         {loading ? <p className="muted">加载中...</p> : null}
@@ -222,6 +237,16 @@ export default function WordsPage() {
                 <Link href={`/words/${item.id}`} className="list-card-link">
                   查看详情
                 </Link>
+                <button
+                  className="link-button secondary"
+                  style={{ padding: "2px 8px", fontSize: "var(--text-xs)", background: "transparent" }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleAddToReview(item.id, item.displayText);
+                  }}
+                >
+                  📅 加入复习
+                </button>
               </div>
               <strong>{item.displayText}</strong>
               <span className="muted">{item.meaningZh || "暂无释义"}</span>

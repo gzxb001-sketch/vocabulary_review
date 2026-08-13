@@ -65,6 +65,7 @@ export async function getCachedReviewItems(): Promise<unknown[]> {
 export async function enqueueSubmit(entry: {
   wordId: string;
   result: "known" | "vague" | "forgot";
+  clientResultId?: string;
 }) {
   try {
     const db = await openDB();
@@ -84,7 +85,7 @@ export async function enqueueSubmit(entry: {
 
 // 获取所有待提交的队列
 async function getQueue(): Promise<
-  { id: number; wordId: string; result: string; createdAt: number }[]
+  { id: number; wordId: string; result: string; createdAt: number; clientResultId?: string }[]
 > {
   try {
     const db = await openDB();
@@ -125,7 +126,11 @@ export async function syncQueue(): Promise<{
       const res = await fetch("/api/review/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ wordId: entry.wordId, result: entry.result }),
+        body: JSON.stringify({
+          wordId: entry.wordId,
+          result: entry.result,
+          clientResultId: entry.clientResultId,
+        }),
       });
       if (res.ok) {
         await removeFromQueue(entry.id);

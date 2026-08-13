@@ -96,6 +96,7 @@ export default function CapturePage() {
           text: item.text,
           selected: item.isVerified || i === 0,
           sourceType: "exam" as const,
+          sourceContext: item.sourceContext,
           imageId: "img_" + now,
         }))
       );

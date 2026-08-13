@@ -698,6 +698,16 @@ textarea:focus-visible,
   position: relative;
 }
 
+.hero-due-hint {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-3);
+  max-width: 340px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.5;
+}
+
 .hero-streak {
   font-size: var(--text-sm);
   color: var(--color-warning);
@@ -1064,6 +1074,39 @@ textarea:focus-visible,
   border-radius: var(--radius-md);
   font-size: var(--text-sm);
   font-weight: var(--font-bold);
+}
+
+/* ---- Stubborn Words Page ---- */
+.stubborn-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.stubborn-card {
+  padding: var(--space-3);
+  transition: background 0.15s;
+}
+
+.stubborn-card:hover {
+  background: var(--color-bg-secondary);
+}
+
+.stubborn-card-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.stubborn-card-word {
+  font-size: var(--text-lg);
+  font-weight: var(--font-bold);
+  color: var(--color-text-primary);
+}
+
+.stubborn-card-phonetic {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
 }
 
 
@@ -1437,6 +1480,17 @@ textarea:focus-visible,
   color: var(--color-text-primary);
   margin: 0 0 var(--space-3);
   line-height: var(--leading-tight);
+}
+
+.review-context {
+  font-size: var(--text-sm);
+  font-style: italic;
+  color: var(--color-text-muted);
+  border-left: 3px solid var(--color-primary-border);
+  padding-left: var(--space-3);
+  margin: 0 0 var(--space-3);
+  line-height: var(--leading-relaxed);
+  word-break: break-word;
 }
 
 .flashcard-detail {
@@ -2081,4 +2135,153 @@ textarea:focus-visible,
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+
+/* ============================================================
+   Notification Subscribe — 每日复习提醒
+   ============================================================ */
+
+.notify-card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+  border-radius: var(--radius-xl);
+  background: rgba(236, 252, 203, 0.4);
+  border: 1px solid rgba(190, 242, 100, 0.4);
+}
+
+.notify-icon {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.notify-body {
+  flex: 1;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.notify-title {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+}
+
+.notify-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.notify-status {
+  font-size: var(--text-sm);
+  color: var(--color-success);
+  font-weight: var(--font-semibold);
+}
+
+.notify-time {
+  padding: 6px var(--space-2);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+}
+
+.notify-btn {
+  border: none;
+  border-radius: var(--radius-full);
+  padding: 6px var(--space-4);
+  background: var(--color-primary);
+  color: #fff;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.notify-btn:hover:not(:disabled) {
+  background: var(--color-primary-dark);
+}
+
+.notify-btn.secondary {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
+.notify-btn.secondary:hover:not(:disabled) {
+  border-color: var(--color-text-muted);
+}
+
+.notify-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.notify-msg {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* 邮件提醒开关 */
+.email-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.email-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.email-switch-track {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  background: var(--color-border-strong);
+  transition: background var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.email-switch-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: var(--shadow-glass-sm);
+  transition: transform var(--transition-fast);
+}
+
+.email-switch input:checked + .email-switch-track {
+  background: var(--color-primary);
+}
+
+.email-switch input:checked + .email-switch-track::after {
+  transform: translateX(18px);
+}
+
+.email-switch input:focus-visible + .email-switch-track {
+  outline: 2px solid var(--color-primary-light);
+  outline-offset: 2px;
+}
+
+.email-switch-label {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-medium);
 }

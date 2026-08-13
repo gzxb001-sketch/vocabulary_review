@@ -100,3 +100,48 @@ async function cacheFirst(request) {
     return new Response("", { status: 408 });
   }
 }
+
+// 推送通知：接收服务端推送并展示系统通知
+self.addEventListener("push", (event) => {
+  let data = {
+    title: "竹墨词库",
+    body: "该复习啦，保持记忆曲线！",
+    url: "/review",
+  };
+  if (event.data) {
+    try {
+      const payload = event.data.json();
+      data = { ...data, ...payload };
+    } catch {
+      // 非 JSON 时忽略，使用默认文案
+    }
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      data: { url: data.url },
+    })
+  );
+});
+
+// 点击通知：聚焦已打开的窗口，否则打开复习页
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || "/review";
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      for (const client of list) {
+        if ("focus" in client) {
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(url);
+      }
+    })
+  );
+});

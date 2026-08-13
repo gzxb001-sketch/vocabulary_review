@@ -3,7 +3,10 @@ import { prisma } from "@/lib/db";
 import { getUserIdFromCookies } from "@/lib/auth";
 import { WeeklyTrendChart } from "./weekly-trend-chart";
 import LogoutButton from "./ui/logout-button";
+import EmailReminder from "./ui/email-reminder";
+import ImportKaoyanButton from "./import-kaoyan-button";
 import { DEMO_WORDS } from "@/lib/demo-words";
+import { DAILY_PLAN } from "@/lib/review-config";
 
 export const dynamic = "force-dynamic";
 
@@ -98,9 +101,14 @@ async function getHomeData(userId: string) {
       else break;
     }
 
+    const todayPlan = Math.min(dueCount, DAILY_PLAN);
+    const remainingDue = Math.max(0, dueCount - todayPlan);
+
     return {
       totalWordsCount,
       dueCount,
+      todayPlan,
+      remainingDue,
       todayAddedCount,
       todayReviewedCount,
       recentWords,
@@ -116,6 +124,8 @@ async function getHomeData(userId: string) {
     return {
       totalWordsCount: 0,
       dueCount: 0,
+      todayPlan: 0,
+      remainingDue: 0,
       todayAddedCount: 0,
       todayReviewedCount: 0,
       recentWords: [],
@@ -167,6 +177,8 @@ export default async function HomePage() {
       : {
           totalWordsCount: 0,
           dueCount: 0,
+          todayPlan: 0,
+          remainingDue: 0,
           todayAddedCount: 0,
           todayReviewedCount: 0,
           recentWords: [],
@@ -228,13 +240,24 @@ export default async function HomePage() {
               🔥 已连续打卡 <strong>{data.streak}</strong> 天
             </p>
           )}
-          {data.dueCount > 0 ? (
+          {data.todayPlan > 0 ? (
             <>
-              <p className="hero-due-count">{data.dueCount}</p>
-              <p className="hero-due-label">个词待复习</p>
+              <p className="hero-due-count">{data.todayPlan}</p>
+              <p className="hero-due-label">个词 · 今日计划</p>
+              <p className="hero-due-hint">
+                今日已复习 {data.todayReviewedCount} / {data.todayPlan}
+                {data.remainingDue > 0
+                  ? ` · 还有 ${data.remainingDue} 个往期词顺延到之后`
+                  : " · 完成后即可休息"}
+              </p>
             </>
           ) : (
-            <p className="hero-due-label">今天没有待复习</p>
+            <>
+              <p className="hero-due-label">今天没有待复习</p>
+              <p className="hero-due-hint" style={{ marginTop: "var(--space-1)" }}>
+                可以去录入新词，或者明天再来
+              </p>
+            </>
           )}
           <div className="hero-btns">
             <Link href="/review" className="hero-btn-primary">开始复习</Link>
@@ -243,6 +266,9 @@ export default async function HomePage() {
           </div>
         </section>
       )}
+
+      {/* 每日复习提醒 */}
+      {!isGuest && <EmailReminder />}
 
       {/* Stats */}
       {isGuest ? (
@@ -306,8 +332,11 @@ export default async function HomePage() {
             </div>
           </div>
           <p className="muted" style={{ marginTop: "var(--space-3)", fontSize: "var(--text-sm)" }}>
-            录入 5 个词后，统计卡片将自动激活
+            录入 5 个词后，统计卡片将自动激活。也可以一键导入考研核心词快速起步：
           </p>
+          <div style={{ marginTop: "var(--space-3)" }}>
+            <ImportKaoyanButton />
+          </div>
         </section>
       )}
 
@@ -429,7 +458,10 @@ export default async function HomePage() {
       {/* 顽固词 — 仅登录用户 */}
       {!isGuest && data.stubbornWords.length > 0 && (
         <section className="card" style={{ marginTop: "var(--space-4)", padding: "var(--space-4)" }}>
-          <h2 className="home-section-title">顽固词 · 集中攻克</h2>
+          <div className="home-col-header">
+            <h2 className="home-section-title">顽固词 · 集中攻克</h2>
+            <Link href="/words/stubborn" className="home-col-more">全部 →</Link>
+          </div>
           <div className="home-tag-cloud">
             {data.stubbornWords.map((s) => (
               <Link key={s.wordId} href={`/words/${s.word.id}`} className="home-word-tag stubborn">
