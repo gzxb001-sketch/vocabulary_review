@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const links = [
+  { href: "/", label: "首页" },
   { href: "/words", label: "词库" },
   { href: "/review", label: "复习" },
 ] as const;

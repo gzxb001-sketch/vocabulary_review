@@ -274,6 +274,11 @@ textarea:focus-visible,
   font-size: var(--text-lg);
   color: var(--color-text-primary);
   letter-spacing: var(--tracking-tight);
+  transition: color var(--transition-fast);
+}
+
+.topnav-brand:hover {
+  color: var(--color-primary);
 }
 
 .topnav-brand::before {
@@ -2336,5 +2341,69 @@ textarea:focus-visible,
   margin: var(--space-1) 0 0;
   font-size: var(--text-sm);
   color: var(--color-text-muted);
+  line-height: var(--leading-relaxed);
+}
+
+
+/* ============================================================
+   Auth Page — 登录 / 注册 / 重置密码
+   ============================================================ */
+
+.auth-stack {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.auth-text-link {
+  display: inline;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: color var(--transition-fast);
+}
+
+.auth-text-link:hover {
+  color: var(--color-primary);
+}
+
+.auth-text-link.strong {
+  color: var(--color-primary);
+  font-weight: var(--font-semibold);
+}
+
+.auth-text-link.strong:hover {
+  color: var(--color-primary-dark);
+}
+
+.auth-forgot-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: calc(-1 * var(--space-1));
+}
+
+.auth-switch {
+  margin: var(--space-5) 0 0;
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  line-height: var(--leading-relaxed);
+}
+
+.auth-error {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-danger);
+  line-height: var(--leading-relaxed);
+}
+
+.auth-notice {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-success);
   line-height: var(--leading-relaxed);
 }
