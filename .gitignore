@@ -10,3 +10,6 @@ prisma/dev.db
 prisma/dev.db-journal
 *.bak
 *.tsbuildinfo
+
+# Vercel CLI 本地元数据
+.vercel/
