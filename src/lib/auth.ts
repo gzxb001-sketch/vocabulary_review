@@ -12,12 +12,11 @@ function getJwtSecret(): string {
   return "vocabulary-review-dev-secret";
 }
 
-const secret = new TextEncoder().encode(getJwtSecret());
-
 const COOKIE_NAME = "vocab-token";
 const EXPIRES_IN = "7d";
 
 export async function signToken(userId: string): Promise<string> {
+  const secret = new TextEncoder().encode(getJwtSecret());
   return new SignJWT({ sub: userId })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -27,6 +26,7 @@ export async function signToken(userId: string): Promise<string> {
 
 export async function verifyToken(token: string): Promise<string | null> {
   try {
+    const secret = new TextEncoder().encode(getJwtSecret());
     const { payload } = await jwtVerify(token, secret);
     return (payload.sub as string) || null;
   } catch {
