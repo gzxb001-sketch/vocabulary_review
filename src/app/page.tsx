@@ -237,7 +237,10 @@ export default async function HomePage() {
           <p className="hero-brand">竹墨词库</p>
           {data.streak > 1 && (
             <p className="hero-streak">
-              🔥 已连续打卡 <strong>{data.streak}</strong> 天
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M13.5 0.67s0.74 2.65 0.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l0.03-0.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5 0.67z" fill="#fde68a" />
+              </svg>
+              已连续打卡 <strong>{data.streak}</strong> 天
             </p>
           )}
           {data.todayPlan > 0 ? (
@@ -395,10 +398,10 @@ export default async function HomePage() {
                 <h2 className="home-section-title">注册后解锁</h2>
               </div>
               <div className="home-tag-cloud">
-                <span className="home-word-tag">📚 无限词库</span>
-                <span className="home-word-tag">📸 拍照录词</span>
-                <span className="home-word-tag">📊 学习统计</span>
-                <span className="home-word-tag">🔄 间隔记忆</span>
+                <span className="home-word-tag">无限词库</span>
+                <span className="home-word-tag">拍照录词</span>
+                <span className="home-word-tag">学习统计</span>
+                <span className="home-word-tag">间隔记忆</span>
               </div>
             </div>
           </section>
