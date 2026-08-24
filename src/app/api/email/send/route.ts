@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { sendDueReminders } from "@/lib/email-reminder";
 
-// 定时发送入口：由外部 cron（如 Vercel Cron）每分钟调用一次。
+// 定时发送入口：由外部 cron（如 Vercel Cron / cron-job.org）每分钟调用一次。
 // 若配置了 CRON_SECRET，则需在 Authorization: Bearer <CRON_SECRET> 中携带。
-export async function POST(req: Request) {
+// 同时支持 GET 与 POST，兼容 cron-job.org 默认的 GET 请求。
+async function handleSend(req: Request) {
   const secret = process.env.CRON_SECRET;
   if (secret) {
     const auth = req.headers.get("authorization");
@@ -21,4 +22,12 @@ export async function POST(req: Request) {
       { status: 500 },
     );
   }
+}
+
+export async function GET(req: Request) {
+  return handleSend(req);
+}
+
+export async function POST(req: Request) {
+  return handleSend(req);
 }
