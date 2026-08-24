@@ -7,6 +7,15 @@ function shanghaiParts(now: Date): { hour: number; minute: number } {
   return { hour: t.getUTCHours(), minute: t.getUTCMinutes() };
 }
 
+// 生成应用基础 URL：优先 NEXT_PUBLIC_APP_URL，其次 Vercel 自动注入的生产域名
+function appBaseUrl(): string {
+  const configured = process.env.NEXT_PUBLIC_APP_URL;
+  if (configured) return configured.replace(/\/+$/, "");
+  const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
+  if (vercelUrl) return `https://${vercelUrl}`;
+  return "";
+}
+
 function buildReminderHtml(dueCount: number): string {
   return `
     <div style="font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#3d3d3d;">
@@ -19,7 +28,7 @@ function buildReminderHtml(dueCount: number): string {
         </p>
       </div>
       <div style="margin-top:20px;">
-        <a href="${process.env.NEXT_PUBLIC_APP_URL || ""}/review"
+        <a href="${appBaseUrl()}/review"
            style="display:inline-block;background:#4d7c0f;color:#fff;text-decoration:none;padding:12px 20px;border-radius:10px;font-size:14px;font-weight:600;">
           开始复习
         </a>
