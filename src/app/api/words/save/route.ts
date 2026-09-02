@@ -23,7 +23,7 @@ type SaveWordInput = {
   synonyms?: string[];
   meanings?: MeaningInput[];
   source: {
-    sourceType: "exam" | "reading" | "lecture" | "manual" | "other";
+    sourceType: "exam" | "reading" | "lecture" | "manual" | "longSentence" | "translation" | "other";
     sourceNote?: string;
     sourceContext?: string;
     imageId?: string;

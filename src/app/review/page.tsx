@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import SpeakButton from "../ui/speak-button";
+import { ANALYTICS_EVENTS, trackEvent } from "@/lib/analytics";
 import {
   saveReviewItems,
   getCachedReviewItems,
@@ -11,6 +12,17 @@ import {
 } from "@/lib/review-offline";
 import { DEMO_WORDS, type DemoReviewItem } from "@/lib/demo-words";
 import { REVIEW_CAPS } from "@/lib/review-config";
+import {
+  IconThumbsUp,
+  IconHelp,
+  IconX,
+  IconCheckCircle,
+  IconXCircle,
+  IconAlertTriangle,
+  IconSparkles,
+  IconPause,
+  IconExternalLink,
+} from "../ui/icons";
 
 type ReviewMeaning = {
   partOfSpeech: string;
@@ -100,6 +112,32 @@ export default function ReviewPage() {
       if (raw) setLastSession(JSON.parse(raw));
     } catch {}
   }, []);
+
+  // 埋点：会话开始/结束各上报一次（ref 防止 StrictMode 重挂载与状态变化导致重复上报）
+  const trackedStartRef = useRef(false);
+  const trackedCompleteRef = useRef(false);
+
+  useEffect(() => {
+    if (loading || isDemo || items.length === 0 || trackedStartRef.current) return;
+    trackedStartRef.current = true;
+    trackEvent(ANALYTICS_EVENTS.reviewSessionStart, { wordCount: items.length });
+  }, [loading, isDemo, items.length]);
+
+  useEffect(() => {
+    if (items.length === 0 || index < items.length || trackedCompleteRef.current) return;
+    trackedCompleteRef.current = true;
+    if (isDemo) {
+      trackEvent(ANALYTICS_EVENTS.demoSessionComplete);
+      return;
+    }
+    trackEvent(ANALYTICS_EVENTS.reviewSessionComplete, {
+      total: sessionResults.known + sessionResults.vague + sessionResults.forgot,
+      known: sessionResults.known,
+      vague: sessionResults.vague,
+      forgot: sessionResults.forgot,
+      endedEarly: wasEndedEarly,
+    });
+  }, [index, items.length, isDemo, sessionResults, wasEndedEarly]);
 
   // 复习完成时保存本轮数据
   useEffect(() => {
@@ -364,7 +402,7 @@ export default function ReviewPage() {
     return (
       <main className="container fade-in">
         <div className="card empty-state">
-          <span className="empty-state-icon">✅</span>
+          <span className="empty-state-icon"><IconCheckCircle /></span>
           <h1 className="empty-state-title">今天没有待复习的词</h1>
           <p className="empty-state-text">可以先去录入几个今天遇到的生词。</p>
           <div className="link-row">
@@ -380,7 +418,7 @@ export default function ReviewPage() {
       <main className="container fade-in">
         {isDemo ? (
           <div className="card empty-state">
-            <span className="empty-state-icon">🎉</span>
+            <span className="empty-state-icon"><IconSparkles /></span>
             <h1 className="empty-state-title">体验完成</h1>
             <p className="empty-state-text">
               这只是演示模式。注册账号后，你可以录入自己的词库、<br />
@@ -393,7 +431,7 @@ export default function ReviewPage() {
           </div>
         ) : (
           <div className="card stack review-summary" style={{ textAlign: "center" }}>
-            <span className="empty-state-icon">{wasEndedEarly ? "⏸" : "🎉"}</span>
+            <span className="empty-state-icon">{wasEndedEarly ? <IconPause /> : <IconSparkles />}</span>
             <h1 className="empty-state-title">{wasEndedEarly ? "复习已暂停" : "今天复习完成"}</h1>
             <p className="empty-state-text">
               {wasEndedEarly
@@ -413,14 +451,14 @@ export default function ReviewPage() {
             )}
             {(sessionResults.known > 0 || sessionResults.vague > 0 || sessionResults.forgot > 0) && (
               <div className="review-summary-row">
-                <div className="review-summary-chip" style={{ background: "rgba(22,163,74,0.08)", color: "#16a34a" }}>
-                  👍 认识 {sessionResults.known}
+                <div className="review-summary-chip known">
+                  <IconThumbsUp /> 认识 {sessionResults.known}
                 </div>
-                <div className="review-summary-chip" style={{ background: "rgba(202,138,4,0.08)", color: "#ca8a04" }}>
-                  🤔 模糊 {sessionResults.vague}
+                <div className="review-summary-chip vague">
+                  <IconHelp /> 模糊 {sessionResults.vague}
                 </div>
-                <div className="review-summary-chip" style={{ background: "rgba(220,38,38,0.08)", color: "#dc2626" }}>
-                  😅 不会 {sessionResults.forgot}
+                <div className="review-summary-chip forgot">
+                  <IconX /> 不会 {sessionResults.forgot}
                 </div>
               </div>
             )}
@@ -430,7 +468,7 @@ export default function ReviewPage() {
               return (
                 <p className="muted" style={{ fontSize: "var(--text-sm)", marginTop: "var(--space-2)" }}>
                   {comp.delta > 0
-                    ? `🎯 认识率比上次（${comp.lastDate}）提升了 ${comp.delta}%，继续保持！`
+                    ? `认识率比上次（${comp.lastDate}）提升了 ${comp.delta}%，继续保持！`
                     : comp.delta < 0
                       ? `认识率比上次下降了 ${Math.abs(comp.delta)}%，下次集中攻克错词`
                       : `认识率与上次持平，稳步推进中`}
@@ -454,7 +492,7 @@ export default function ReviewPage() {
     return (
       <main className="container fade-in">
         <div className="card empty-state">
-          <span className="empty-state-icon">🎉</span>
+          <span className="empty-state-icon"><IconSparkles /></span>
           <h1 className="empty-state-title">这一轮完成了</h1>
           <p className="empty-state-text">
             已完成 {index} / {items.length} 个，休息一下再继续吧。
@@ -520,7 +558,7 @@ export default function ReviewPage() {
             }}
             title="查看详情"
           >
-            📖
+            <IconExternalLink />
           </Link>
         </h1>
 
@@ -556,12 +594,12 @@ export default function ReviewPage() {
               <div className="stack" style={{ textAlign: "center", marginTop: "var(--space-3)" }}>
                 {spellingCorrect ? (
                   <p style={{ color: "var(--color-success)", fontWeight: "var(--font-semibold)" }}>
-                    ✅ 拼写正确！
+                    <IconCheckCircle /> 拼写正确！
                   </p>
                 ) : (
                   <div>
                     <p style={{ color: "var(--color-danger)", fontWeight: "var(--font-semibold)", marginBottom: "var(--space-2)" }}>
-                      ❌ 拼写有误
+                      <IconXCircle /> 拼写有误
                     </p>
                     <p className="word-display" style={{ fontSize: "1.5rem" }}>
                       正确答案：{current.displayText}
@@ -611,7 +649,7 @@ export default function ReviewPage() {
                   {obscureMeanings.length > 0 && (
                     <details className="obscure-section" style={{ marginTop: "var(--space-2)" }}>
                       <summary className="obscure-toggle">
-                        ⚠️ 熟词僻义 — {obscureMeanings.length} 条
+                        <IconAlertTriangle /> 熟词僻义 — {obscureMeanings.length} 条
                       </summary>
                       <div style={{ marginTop: "var(--space-2)", display: "grid", gap: "var(--space-1)" }}>
                         {obscureMeanings.map((m, i) => (
@@ -659,13 +697,13 @@ export default function ReviewPage() {
             ) : (
               <div className="answer-buttons">
                 <button className="answer-btn known" onClick={() => submit("known")}>
-                  <span className="answer-emoji">👍</span>认识
+                  <span className="answer-emoji"><IconThumbsUp /></span>认识
                 </button>
                 <button className="answer-btn vague" onClick={() => submit("vague")}>
-                  <span className="answer-emoji">🤔</span>模糊
+                  <span className="answer-emoji"><IconHelp /></span>模糊
                 </button>
                 <button className="answer-btn forgot" onClick={() => submit("forgot")}>
-                  <span className="answer-emoji">😅</span>不会
+                  <span className="answer-emoji"><IconX /></span>不会
                 </button>
               </div>
             )}

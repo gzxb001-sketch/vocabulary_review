@@ -2,9 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { setAuthCookie } from "@/lib/auth";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
+
+// 注册限流：同一 IP 1 小时内最多 10 次注册，防止批量注册垃圾账号
+const REGISTER_MAX_ATTEMPTS = 10;
+const REGISTER_WINDOW_MS = 60 * 60 * 1000;
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = getClientIp(req);
+    const limit = rateLimit(`register:${ip}`, { max: REGISTER_MAX_ATTEMPTS, windowMs: REGISTER_WINDOW_MS });
+    if (!limit.allowed) {
+      return NextResponse.json(
+        { message: `注册过于频繁，请 ${Math.ceil(limit.retryAfterSec / 60)} 分钟后再试` },
+        { status: 429 },
+      );
+    }
+
     const { email, password } = await req.json();
 
     if (!email || !password) {

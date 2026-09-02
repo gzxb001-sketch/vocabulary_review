@@ -127,16 +127,23 @@ export default function EmailReminder() {
         </div>
 
         {enabled && (
-          <div className="notify-row">
-            <span className="notify-msg">每天</span>
-            <input
-              type="time"
-              value={time}
-              onChange={(e) => handleTimeChange(e.target.value)}
-              className="notify-time"
-            />
-            <span className="notify-msg">提醒（北京时间）</span>
-          </div>
+          <>
+            <div className="notify-row">
+              <span className="notify-msg">每天</span>
+              <input
+                type="time"
+                value={time}
+                onChange={(e) => handleTimeChange(e.target.value)}
+                className="notify-time"
+              />
+              <span className="notify-msg">起提醒（北京时间）</span>
+            </div>
+            <div className="notify-row">
+              <span className="notify-msg" style={{ opacity: 0.7 }}>
+                到点后若暂时没发出（如服务繁忙），恢复后会当天补发，每天最多一封。
+              </span>
+            </div>
+          </>
         )}
 
         <div className="notify-row">

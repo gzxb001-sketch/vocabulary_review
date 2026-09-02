@@ -12,6 +12,8 @@ enum SourceType {
   reading
   lecture
   manual
+  longSentence
+  translation
   other
 }
 
@@ -35,6 +37,11 @@ model User {
   emailReminderEnabled Boolean @default(false)
   emailReminderHour    Int     @default(20)
   emailReminderMinute  Int     @default(0)
+  // 最近一次实际发出提醒邮件的时刻：窗口匹配 + 当日去重的依据
+  emailLastSentAt      DateTime?
+
+  // 考试日期（考研初试等）。设置后按剩余天数进入冲刺阶段，动态调整每日配额。
+  examDate DateTime?
 
   words         Word[]
   sources       WordSource[]

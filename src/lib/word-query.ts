@@ -58,8 +58,10 @@ export function buildWordWhere(q: string, filter: WordFilter): Prisma.WordWhereI
     ...(filter === "due"
       ? {
           schedule: {
-            nextReviewAt: {
-              lte: now,
+            some: {
+              nextReviewAt: {
+                lte: now,
+              },
             },
           },
         }
@@ -85,9 +87,21 @@ export function buildWordOrderBy(sort: WordSort): Prisma.WordOrderByWithRelation
     return { displayText: "asc" };
   }
 
+  // review_asc 需按一对多 schedule 的 nextReviewAt 排序，Prisma 无法对
+  // to-many 关系子字段直接 orderBy，这里用 createdAt 兜底，调用方需用
+  // sortWordsByNextReview 对结果做应用层排序。
   if (sort === "review_asc") {
-    return { schedule: { nextReviewAt: "asc" } };
+    return { createdAt: "desc" };
   }
 
   return { createdAt: "desc" };
+}
+
+// 按「下次复习时间」升序的应用层排序（无复习计划的词排最后）。
+export function sortWordsByNextReview<T extends { schedule: { nextReviewAt: Date }[] }>(items: T[]): T[] {
+  return items.sort((a, b) => {
+    const an = a.schedule[0]?.nextReviewAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
+    const bn = b.schedule[0]?.nextReviewAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
+    return an - bn;
+  });
 }

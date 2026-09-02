@@ -1,16 +1,19 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getUserIdFromCookies } from "@/lib/auth";
+import { calculateStreak, countMasteredWords } from "@/lib/stats";
+import { getSprintInfo, type SprintInfo } from "@/lib/sprint";
 import { WeeklyTrendChart } from "./weekly-trend-chart";
+import { ReviewHeatmap } from "./ui/review-heatmap";
 import LogoutButton from "./ui/logout-button";
 import EmailReminder from "./ui/email-reminder";
+import ExamSprintCard from "./ui/exam-sprint-card";
 import ImportKaoyanButton from "./import-kaoyan-button";
 import { DEMO_WORDS } from "@/lib/demo-words";
-import { DAILY_PLAN } from "@/lib/review-config";
 
 export const dynamic = "force-dynamic";
 
-async function getHomeData(userId: string) {
+async function getHomeData(userId: string, sprint: SprintInfo) {
   try {
     const now = new Date();
     const startOfToday = new Date();
@@ -21,7 +24,8 @@ async function getHomeData(userId: string) {
 
     const [
       totalWordsCount,
-      dueCount,
+      dueNewCount,
+      dueReviewCount,
       todayAddedCount,
       todayReviewedCount,
       recentWords,
@@ -30,10 +34,15 @@ async function getHomeData(userId: string) {
       weeklyKnownCount,
       weeklyTotalCount,
       stubbornWords,
+      masteredCount,
     ] = await Promise.all([
       prisma.word.count({ where: { userId } }),
+      // 到期词拆分统计：新词/旧词分别受冲刺配额约束，与 /api/review/today 一致
       prisma.reviewSchedule.count({
-        where: { userId, nextReviewAt: { lte: now } },
+        where: { userId, nextReviewAt: { lte: now }, reviewCount: 0 },
+      }),
+      prisma.reviewSchedule.count({
+        where: { userId, nextReviewAt: { lte: now }, reviewCount: { gt: 0 } },
       }),
       prisma.word.count({
         where: { userId, createdAt: { gte: startOfToday } },
@@ -74,34 +83,19 @@ async function getHomeData(userId: string) {
         orderBy: [{ easeScore: "asc" }, { reviewCount: "desc" }],
         take: 5,
       }),
+      countMasteredWords(userId),
     ]);
 
     const weeklyKnownRate =
       weeklyTotalCount > 0 ? Math.round((weeklyKnownCount / weeklyTotalCount) * 100) : 0;
 
-    // 连续打卡天数
-    const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-    const allReviews = await prisma.review.findMany({
-      where: { userId, reviewedAt: { gte: ninetyDaysAgo } },
-      select: { reviewedAt: true },
-      orderBy: { reviewedAt: "desc" },
-    });
-    const reviewDays = new Set<string>();
-    for (const r of allReviews) {
-      const d = new Date(r.reviewedAt);
-      reviewDays.add(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`);
-    }
-    let streak = 0;
-    const checkDate = new Date(now);
-    const todayKey = `${checkDate.getFullYear()}-${checkDate.getMonth()}-${checkDate.getDate()}`;
-    if (!reviewDays.has(todayKey)) checkDate.setDate(checkDate.getDate() - 1);
-    for (let i = 0; i < 90; i++) {
-      const key = `${checkDate.getFullYear()}-${checkDate.getMonth()}-${checkDate.getDate()}`;
-      if (reviewDays.has(key)) { streak++; checkDate.setDate(checkDate.getDate() - 1); }
-      else break;
-    }
+    // 连续打卡天数（共享实现，与 /api/stats/weekly 保持一致）
+    const streak = await calculateStreak(userId, now);
 
-    const todayPlan = Math.min(dueCount, DAILY_PLAN);
+    const dueCount = dueNewCount + dueReviewCount;
+    const todayPlan =
+      Math.min(dueNewCount, sprint.caps.newPerDay) +
+      Math.min(dueReviewCount, sprint.caps.reviewPerDay);
     const remainingDue = Math.max(0, dueCount - todayPlan);
 
     return {
@@ -118,6 +112,7 @@ async function getHomeData(userId: string) {
       weeklyKnownRate,
       stubbornWords,
       streak,
+      masteredCount,
     };
   } catch (error) {
     console.error("homepage data fetch failed:", error);
@@ -135,6 +130,7 @@ async function getHomeData(userId: string) {
       weeklyKnownRate: 0,
       stubbornWords: [],
       streak: 0,
+      masteredCount: 0,
     };
   }
 }
@@ -146,14 +142,14 @@ const SOURCE_LABELS: Record<string, string> = {
 
 export default async function HomePage() {
   let userId: string | null = null;
-  let user: { email: string } | null = null;
+  let user: { email: string; examDate: Date | null } | null = null;
 
   try {
     userId = await getUserIdFromCookies();
     user = userId
       ? await prisma.user.findUnique({
           where: { id: userId },
-          select: { email: true },
+          select: { email: true, examDate: true },
         })
       : null;
   } catch (e: any) {
@@ -161,7 +157,7 @@ export default async function HomePage() {
       <main className="container">
         <div className="card">
           <h1 className="title">竹墨词库</h1>
-          <p className="muted" style={{ color: "#dc2626", whiteSpace: "pre-wrap" }}>
+          <p className="error-text pre-wrap">
             用户查询失败: {String(e?.message || e)}
           </p>
           <a href="/login" className="button">重新登录</a>
@@ -171,9 +167,10 @@ export default async function HomePage() {
   }
 
   let data: Awaited<ReturnType<typeof getHomeData>>;
+  const sprint = getSprintInfo(user?.examDate);
   try {
     data = userId
-      ? await getHomeData(userId)
+      ? await getHomeData(userId, sprint)
       : {
           totalWordsCount: 0,
           dueCount: 0,
@@ -188,13 +185,14 @@ export default async function HomePage() {
           weeklyKnownRate: 0,
           stubbornWords: [],
           streak: 0,
+          masteredCount: 0,
         };
   } catch (e: any) {
     return (
       <main className="container">
         <div className="card">
           <h1 className="title">竹墨词库</h1>
-          <p className="muted" style={{ color: "#dc2626", whiteSpace: "pre-wrap" }}>
+          <p className="error-text pre-wrap">
             数据加载失败: {String(e?.message || e)}
           </p>
           <a href="/login" className="button">重新登录</a>
@@ -209,13 +207,13 @@ export default async function HomePage() {
     <main className="container">
       {/* User bar */}
       {user ? (
-        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "var(--space-2)", marginBottom: "var(--space-2)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>
+        <div className="user-bar">
           <span>{user.email}</span>
           <LogoutButton />
         </div>
       ) : (
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "var(--space-2)" }}>
-          <Link href="/login" style={{ fontSize: "var(--text-sm)", color: "var(--color-primary)", fontWeight: "var(--font-semibold)" }}>
+        <div className="user-bar">
+          <Link href="/login" className="login-link">
             登录 / 注册
           </Link>
         </div>
@@ -226,7 +224,8 @@ export default async function HomePage() {
         <section className="hero-card-home">
           <p className="hero-brand">竹墨词库</p>
           <p className="hero-due-count">{DEMO_WORDS.length}</p>
-          <p className="hero-due-label">个预置词，免费体验</p>
+          <p className="hero-due-label">个考研预置词，免费体验</p>
+          <p className="hero-due-hint">拍照速录生词 · 间隔记忆 · 考前冲刺计划</p>
           <div className="hero-btns">
             <Link href="/review" className="hero-btn-primary">开始体验</Link>
             <Link href="/login" className="hero-btn-secondary">注册账号</Link>
@@ -257,7 +256,7 @@ export default async function HomePage() {
           ) : (
             <>
               <p className="hero-due-label">今天没有待复习</p>
-              <p className="hero-due-hint" style={{ marginTop: "var(--space-1)" }}>
+              <p className="hero-due-hint mt-1">
                 可以去录入新词，或者明天再来
               </p>
             </>
@@ -268,6 +267,14 @@ export default async function HomePage() {
             <Link href="/capture" className="hero-btn-secondary">拍照录词</Link>
           </div>
         </section>
+      )}
+
+      {/* 考前冲刺计划（仅登录用户） */}
+      {!isGuest && (
+        <ExamSprintCard
+          examDate={user.examDate ? user.examDate.toISOString().slice(0, 10) : null}
+          sprint={sprint}
+        />
       )}
 
       {/* 每日复习提醒 */}
@@ -295,6 +302,15 @@ export default async function HomePage() {
         </section>
       ) : (
         <section className="home-stats-row">
+          <div className="home-stat-card is-mastered">
+            <span
+              className="home-stat-num"
+              title={data.totalWordsCount > 0 ? `掌握率 ${Math.round((data.masteredCount / data.totalWordsCount) * 100)}%` : undefined}
+            >
+              {data.masteredCount}
+            </span>
+            <span className="home-stat-label">已掌握</span>
+          </div>
           <div className="home-stat-card">
             <span className="home-stat-num">{data.totalWordsCount}</span>
             <span className="home-stat-label">词条总数</span>
@@ -316,9 +332,9 @@ export default async function HomePage() {
 
       {/* 新用户引导 */}
       {!isGuest && data.totalWordsCount === 0 && (
-        <section className="onboarding card stack" style={{ textAlign: "center" }}>
+        <section className="onboarding card stack text-center">
           <h2 className="section-title">快速开始</h2>
-          <div style={{ display: "flex", gap: "var(--space-4)", justifyContent: "center", flexWrap: "wrap" }}>
+          <div className="onboarding-steps">
             <div className="onboarding-step">
               <span className="onboarding-num">1</span>
               <p>手动录词<br />或拍照识别</p>
@@ -334,10 +350,10 @@ export default async function HomePage() {
               <p>每日复习<br />科学间隔记忆</p>
             </div>
           </div>
-          <p className="muted" style={{ marginTop: "var(--space-3)", fontSize: "var(--text-sm)" }}>
+          <p className="muted onboarding-hint">
             录入 5 个词后，统计卡片将自动激活。也可以一键导入考研核心词快速起步：
           </p>
-          <div style={{ marginTop: "var(--space-3)" }}>
+          <div className="mt-3">
             <ImportKaoyanButton />
           </div>
         </section>
@@ -350,22 +366,22 @@ export default async function HomePage() {
 
       {/* 本周复习效率（仅登录用户） */}
       {!isGuest && (
-        <section className="card" style={{ marginBottom: "var(--space-4)", padding: "var(--space-4)" }}>
+        <section className="card card-compact mb-4">
           <h2 className="home-section-title">本周复习</h2>
-          <div style={{ display: "flex", gap: "var(--space-4)", alignItems: "center", flexWrap: "wrap" }}>
+          <div className="stat-row">
             <div>
-              <span style={{ fontSize: "var(--text-2xl)", fontWeight: "var(--font-bold)", color: "var(--color-primary)" }}>
+              <span className="stat-num">
                 {data.weeklyTotalCount}
               </span>
-              <span style={{ marginLeft: "var(--space-1)", color: "var(--color-text-secondary)", fontSize: "var(--text-sm)" }}>
+              <span className="stat-unit">
                 次复习
               </span>
             </div>
             <div>
-              <span style={{ fontSize: "var(--text-2xl)", fontWeight: "var(--font-bold)", color: data.weeklyKnownRate >= 60 ? "var(--color-success, #16a34a)" : "var(--color-warning, #ca8a04)" }}>
+              <span className={`stat-num ${data.weeklyKnownRate >= 60 ? "is-good" : "is-warn"}`}>
                 {data.weeklyKnownRate}%
               </span>
-              <span style={{ marginLeft: "var(--space-1)", color: "var(--color-text-secondary)", fontSize: "var(--text-sm)" }}>
+              <span className="stat-unit">
                 认识率
               </span>
             </div>
@@ -375,6 +391,9 @@ export default async function HomePage() {
 
       {/* 学习趋势图（仅登录用户） */}
       {!isGuest && <WeeklyTrendChart />}
+
+      {/* 打卡热力图（仅登录用户） */}
+      {!isGuest && <ReviewHeatmap />}
 
       {/* 最近 */}
       {isGuest ? (
@@ -400,15 +419,16 @@ export default async function HomePage() {
               <div className="home-tag-cloud">
                 <span className="home-word-tag">无限词库</span>
                 <span className="home-word-tag">拍照录词</span>
-                <span className="home-word-tag">学习统计</span>
                 <span className="home-word-tag">间隔记忆</span>
+                <span className="home-word-tag">考前冲刺</span>
+                <span className="home-word-tag">学习统计</span>
               </div>
             </div>
           </section>
 
           {/* 游客注册引导 */}
-          <div className="card" style={{ marginTop: "var(--space-4)", textAlign: "center", padding: "var(--space-6)" }}>
-            <p style={{ margin: "0 0 var(--space-3)", color: "var(--color-text-secondary)", fontSize: "var(--text-md)", lineHeight: "var(--leading-relaxed)" }}>
+          <div className="card text-center mt-4">
+            <p className="cta-text">
               注册账号即可拥有自己的专属词库，<br />拍照录词、间隔复习、数据永久保存。
             </p>
             <Link href="/login" className="link-button">免费注册</Link>
@@ -460,7 +480,7 @@ export default async function HomePage() {
 
       {/* 顽固词 — 仅登录用户 */}
       {!isGuest && data.stubbornWords.length > 0 && (
-        <section className="card" style={{ marginTop: "var(--space-4)", padding: "var(--space-4)" }}>
+        <section className="card card-compact mt-4">
           <div className="home-col-header">
             <h2 className="home-section-title">顽固词 · 集中攻克</h2>
             <Link href="/words/stubborn" className="home-col-more">全部 →</Link>

@@ -1,4 +1,4 @@
-﻿import { create } from "zustand";
+﻿﻿import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
 export type DraftWord = {
@@ -10,7 +10,7 @@ export type DraftWord = {
   phonetic?: string;
   partOfSpeech?: string;
   exampleSentence?: string;
-  sourceType: "exam" | "reading" | "lecture" | "manual" | "other";
+  sourceType: "exam" | "reading" | "lecture" | "manual" | "longSentence" | "translation" | "other";
   sourceNote?: string;
   sourceContext?: string;
   imageId?: string;

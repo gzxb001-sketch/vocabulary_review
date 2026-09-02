@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireUserId, authError } from "@/lib/api-auth";
+import { calculateStreak } from "@/lib/stats";
 
 export async function GET() {
   let userId: string;
@@ -50,48 +51,6 @@ export async function GET() {
       weeklyTrend: [],
     });
   }
-}
-
-// 计算连续打卡天数（向前追溯，有复习行为的那天算打卡）
-async function calculateStreak(
-  userId: string,
-  now: Date,
-): Promise<number> {
-  // 获取最近 90 天的每日复习记录
-  const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-  const reviews = await prisma.review.findMany({
-    where: { userId, reviewedAt: { gte: ninetyDaysAgo } },
-    select: { reviewedAt: true },
-    orderBy: { reviewedAt: "desc" },
-  });
-
-  // 收集有复习行为的天（按日期去重）
-  const reviewDays = new Set<string>();
-  for (const r of reviews) {
-    const d = new Date(r.reviewedAt);
-    reviewDays.add(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`);
-  }
-
-  // 从今天向前数连续天数
-  let streak = 0;
-  const checkDate = new Date(now);
-  // 如果今天还没复习，从昨天开始算
-  const todayKey = `${checkDate.getFullYear()}-${checkDate.getMonth()}-${checkDate.getDate()}`;
-  if (!reviewDays.has(todayKey)) {
-    checkDate.setDate(checkDate.getDate() - 1);
-  }
-
-  for (let i = 0; i < 90; i++) {
-    const key = `${checkDate.getFullYear()}-${checkDate.getMonth()}-${checkDate.getDate()}`;
-    if (reviewDays.has(key)) {
-      streak++;
-      checkDate.setDate(checkDate.getDate() - 1);
-    } else {
-      break;
-    }
-  }
-
-  return streak;
 }
 
 // 近 8 周每周趋势

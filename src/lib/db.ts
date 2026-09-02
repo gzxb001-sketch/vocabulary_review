@@ -19,6 +19,11 @@ function getPrismaClient(): PrismaClient {
   return globalForPrisma.prisma;
 }
 
-export const prisma = new Proxy({} as PrismaClient, {
-  get(_: any, p: string | symbol) { return (getPrismaClient() as any)[p]; },
+export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
+  get(_target, p: string | symbol, receiver) {
+    const client = getPrismaClient();
+    const value = Reflect.get(client, p, receiver);
+    // 函数需要绑定到 client 实例，避免 this 丢失
+    return typeof value === "function" ? value.bind(client) : value;
+  },
 });

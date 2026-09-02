@@ -41,44 +41,6 @@ export type EnrichedWord = {
   synonyms?: string[]; // 来自 Free Dictionary 的同义词
 };
 
-/* ---- 考研真题风格例句生成 ---- */
-
-const VERB_TEMPLATES = [
-  (w: string) => `Researchers have increasingly ${w}ed the importance of interdisciplinary collaboration.`,
-  (w: string) => `The study ${w}s that environmental factors play a decisive role in child development.`,
-  (w: string) => `Economists have long ${w}ed that innovation drives long-term economic growth.`,
-  (w: string) => `The findings ${w} the hypothesis proposed by earlier studies in the 1990s.`,
-];
-
-const NOUN_TEMPLATES = [
-  (w: string) => `The ${w} of digital technology has fundamentally reshaped modern education.`,
-  (w: string) => `${w.charAt(0).toUpperCase() + w.slice(1)} has been a defining feature of the twenty-first century.`,
-  (w: string) => `A deep understanding of ${w} is essential for anyone engaged in academic research.`,
-  (w: string) => `Without sufficient ${w}, even the most well-intentioned policies are doomed to fail.`,
-];
-
-const ADJ_TEMPLATES = [
-  (w: string) => `This is a particularly ${w} issue in developing countries where resources are limited.`,
-  (w: string) => `The most ${w} factor in determining student success turned out to be parental involvement.`,
-  (w: string) => `The report presents ${w} evidence that climate change is accelerating at an alarming rate.`,
-];
-
-const ADV_TEMPLATES = [
-  (w: string) => `The policy has been ${w} successful in reducing urban unemployment.`,
-  (w: string) => `The results, ${w}, confirmed what earlier studies had only suggested.`,
-  (w: string) => `The economy has grown ${w} over the past decade, outpacing all predictions.`,
-];
-
-function generateExample(w: string, pos: string): string {
-  if (!w) return "";
-  const lc = w.toLowerCase();
-  if (/^v/i.test(pos)) return VERB_TEMPLATES[Math.floor(Math.random() * VERB_TEMPLATES.length)](lc);
-  if (/^n/i.test(pos)) return NOUN_TEMPLATES[Math.floor(Math.random() * NOUN_TEMPLATES.length)](lc);
-  if (/^adj/i.test(pos)) return ADJ_TEMPLATES[Math.floor(Math.random() * ADJ_TEMPLATES.length)](lc);
-  if (/^adv/i.test(pos)) return ADV_TEMPLATES[Math.floor(Math.random() * ADV_TEMPLATES.length)](lc);
-  return `The concept of ${lc} has been widely discussed in academic circles.`;
-}
-
 /* ---- Free Dictionary Types ---- */
 
 type FDMeaning = { partOfSpeech?: string; definitions?: Array<{ definition?: string; example?: string; synonyms?: string[] }> };

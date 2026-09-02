@@ -13,3 +13,6 @@ prisma/dev.db-journal
 
 # Vercel CLI 本地元数据
 .vercel/
+
+# 本地工具产物
+.workbuddy/

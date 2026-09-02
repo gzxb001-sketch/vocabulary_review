@@ -5,6 +5,8 @@ import { createWorker } from "tesseract.js";
 import { useRouter } from "next/navigation";
 import { useDraftWordStore } from "@/store/draft-words";
 import { extractCandidatesFromRawText } from "@/lib/ocr-cleaner";
+import { useAuth } from "@/lib/use-auth";
+import GuestCta from "../ui/guest-cta";
 
 // 图片预处理：灰度化 + 增强对比度，提高 OCR 准确率
 function preprocessImage(file: File): Promise<Blob> {
@@ -48,6 +50,7 @@ export default function CapturePage() {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
+  const { isGuest } = useAuth();
 
   type Candidate = { text: string; isMarked?: boolean; sourceContext?: string };
 
@@ -135,6 +138,8 @@ export default function CapturePage() {
       <div className="card stack">
         <h1 className="title">拍照录词</h1>
         <p className="subtitle">上传包含英文单词的图片，系统自动提取候选词条。</p>
+
+        {isGuest && <GuestCta message="可先体验 OCR 识别，登录后即可保存到词库" />}
 
         {preview && (
           <div style={{ textAlign: "center" }}>

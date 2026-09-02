@@ -11,7 +11,7 @@
 - **多租户数据隔离**：所有查询与变更均按 `userId` 过滤，按 id 操作使用 `{ id, userId }` 双重归属校验，A 用户无法访问 B 用户数据。
 - **找回密码**：邮箱验证码重置密码（10 分钟有效、5 次尝试上限、发送冷却、防枚举）。
 - **提醒通知**：邮件提醒（QQ SMTP）与浏览器 Web Push 推送。
-- **学习统计**：每周趋势图、词库筛选、顽固词标记。
+- **学习统计**：每周趋势图、词库筛选、顽固词标记、掌握度（间隔 ≥21 天且最近一次为「认识」即视为已掌握）。
 
 ## 技术栈
 
@@ -94,6 +94,7 @@ npm run dev
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | 推送功能 | Web Push 公钥 |
 | `VAPID_PRIVATE_KEY` | 推送功能 | Web Push 私钥 |
 | `VAPID_SUBJECT` | 推送功能 | VAPID 联系人（`mailto:` 地址） |
+| `CRON_SECRET` | 生产 ✅ | 定时任务鉴权。`/api/email/send` 在生产环境未配置时直接拒绝（403）；cron 调用需携带 `Authorization: Bearer <CRON_SECRET>` |
 
 > `JWT_SECRET` 生产环境推荐用 `crypto.randomBytes(64).toString('hex')` 生成。若未配置且 `NODE_ENV=production`，鉴权会直接抛出错误，避免使用可预测的兜底密钥。
 
@@ -155,6 +156,41 @@ prisma/
 ```
 
 4. 修改环境变量后需手动 **Redeploy** 才会生效。
+
+### 邮件提醒的定时触发（重要）
+
+邮件提醒不会由进程内的 `setInterval` 常驻触发（在 Vercel 等 serverless 平台上该定时器会被冻结）。生产环境请选择其一：
+
+- **Vercel Cron（已配置在 `vercel.json`）**：每分钟调用 `/api/email/send`。注意 Vercel **Hobby 计划不支持每分钟频率**（最低每天一次）——由于提醒采用「窗口匹配 + 当日去重」，Hobby 计划改为每天一次的 cron 也可以正常工作：把 cron 时刻设在用户提醒时刻之后即可（如 cron `0 12 * * *`（UTC 12:00 = 北京 20:00），则所有设定 20:00 及更早的用户都会在那一刻收到当天提醒）。
+- **cron-job.org 等外部服务**：每分钟 GET/POST 请求 `https://<你的域名>/api/email/send`，**必须携带 `Authorization: Bearer <CRON_SECRET>` 请求头**（生产环境未配置 CRON_SECRET 时该接口会拒绝请求）。
+
+**发送语义**：用户设定的提醒时刻是「最早发送时刻」而非精确时刻。cron 只要在该时刻之后到达（当天任意时间），提醒就会发出（每天最多一封，由 `emailLastSentAt` 去重）；错过精确分钟、cron 抖动或当天恢复后都会自动补发，发送失败会在下个周期重试。
+
+**安全基线**：生产环境启动时会校验必需环境变量（`DATABASE_URL`、`JWT_SECRET`），缺失直接报错退出，不会带病部署；`CRON_SECRET` 缺失时打印告警，且 `/api/email/send` 会拒绝调用。
+
+本地/自托管（长期运行的 Node 进程）会自动启动进程内调度器，无需额外配置。
+
+## 数据埋点
+
+产品使用 Vercel Web Analytics 做漏斗分析（无 cookie，部署后无需额外配置；在 Vercel 项目面板 **Analytics** 标签页开启即可）。事件定义集中在 `src/lib/analytics.ts`，换供应商只需改这一个文件。
+
+| 事件 | 参数 | 含义 |
+|------|------|------|
+| `guest_save_blocked` | `page`, `wordCount` | 游客保存被 401 拦截（注册模态弹出的时刻），漏斗关键摩擦点 |
+| `auth_success` | `mode`, `source` | 注册/登录成功；`source` 区分页内模态（manual / capture_review）与登录页 |
+| `word_save_success` | `page`, `count`, `convertedFromGuest` | 词条保存成功；`convertedFromGuest=true` 表示注册后自动续存的首批词（激活信号） |
+| `review_session_start` | `wordCount` | 已登录用户开始一次复习会话 |
+| `review_session_complete` | `total`, `known`, `vague`, `forgot`, `endedEarly` | 一次复习会话结束（完成或提前结束） |
+| `demo_session_complete` | — | 游客体验模式复习完成 |
+
+**北极星指标口径**：
+
+- **游客→注册转化率** = `auth_success(source 为 auth_modal)` / `guest_save_blocked`
+- **复习完成率（按天）** = `review_session_complete(endedEarly=false)` / `review_session_start` 的会话数
+- **D7 留存**：由 Vercel 面板按访客回访估算（页面自动上报 pageview）
+- **顽固词攻克率**：待「专项攻克模式」上线后补充事件
+
+开发环境不发数据：事件写入 `window.__zhumoEvents` 并打印到控制台，便于本地验证参数。
 
 ## 常用脚本
 

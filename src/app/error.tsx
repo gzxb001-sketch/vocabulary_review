@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { IconAlertTriangle } from "./ui/icons";
 
 export default function Error({
   error,
@@ -16,7 +17,7 @@ export default function Error({
   return (
     <main className="container fade-in">
       <div className="card empty-state">
-        <span className="empty-state-icon">⚠️</span>
+        <span className="empty-state-icon"><IconAlertTriangle /></span>
         <h1 className="empty-state-title">页面加载出错</h1>
         <p className="empty-state-text">
           {error.message || "发生了未知错误，请刷新页面重试。"}

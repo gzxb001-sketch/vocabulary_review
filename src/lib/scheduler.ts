@@ -52,7 +52,12 @@ export function calculateNextSchedule(
   }
 
   if (result === "known") {
+    // 记忆梯度：新词当天完成首次回忆后先给 2 天短间隔，
+    // 沿 2 → 4 → 7 阶梯爬升，跨过遗忘曲线最陡的前 48 小时，
+    // 之后才交给 ease 乘数做指数增长。
     if (safeInterval < 1) {
+      nextInterval = 2;
+    } else if (safeInterval < 2) {
       nextInterval = 4;
     } else if (safeInterval < 4) {
       nextInterval = 7;

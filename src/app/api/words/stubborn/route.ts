@@ -20,12 +20,12 @@ export async function GET() {
             displayText: true,
             meaningZh: true,
             phonetic: true,
+            reviews: {
+              orderBy: { reviewedAt: "desc" },
+              take: 5,
+              select: { reviewResult: true },
+            },
           },
-        },
-        reviews: {
-          orderBy: { reviewedAt: "desc" },
-          take: 5,
-          select: { reviewResult: true },
         },
       },
       orderBy: [{ easeScore: "asc" }, { reviewCount: "desc" }],
@@ -42,7 +42,7 @@ export async function GET() {
         easeScore: item.easeScore,
         lastResult: item.lastResult,
         nextReviewAt: item.nextReviewAt,
-        recentResults: item.reviews.map((r) => r.reviewResult),
+        recentResults: item.word.reviews.map((r) => r.reviewResult),
       })),
     });
   } catch (error) {

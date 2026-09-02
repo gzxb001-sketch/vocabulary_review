@@ -2,8 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/use-auth";
+import { ANALYTICS_EVENTS, trackEvent } from "@/lib/analytics";
+import GuestCta from "../ui/guest-cta";
+import AuthModal from "../ui/auth-modal";
 
-type SourceType = "manual" | "exam" | "reading" | "lecture" | "other";
+type SourceType = "manual" | "exam" | "reading" | "lecture" | "longSentence" | "translation" | "other";
 
 type MeaningEntry = {
   partOfSpeech: string;
@@ -22,6 +26,7 @@ type EnrichItem = {
   partOfSpeech?: string;
   exampleSentence?: string;
   meanings?: MeaningEntry[];
+  synonyms?: string[];
   found?: boolean;
 };
 
@@ -41,6 +46,11 @@ export default function ManualPage() {
   const [error, setError] = useState("");
   const [hint, setHint] = useState("");
   const [synonyms, setSynonyms] = useState<string[]>([]);
+  const { isGuest } = useAuth();
+
+  // 游客保存被 401 拦截时：弹出页内注册/登录模态，表单内容保留，成功后自动续存。
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authedLocally, setAuthedLocally] = useState(false);
 
   async function handleEnrich() {
     if (!displayText.trim()) { setError("请先输入单词或短语"); return; }
@@ -68,7 +78,7 @@ export default function ManualPage() {
     } finally { setEnriching(false); }
   }
 
-  async function handleSave() {
+  async function handleSave(convertedFromGuest = false) {
     if (!displayText.trim()) { setError("请先输入单词或短语"); return; }
     setError(""); setSaving(true);
     try {
@@ -90,10 +100,21 @@ export default function ManualPage() {
         }),
       });
       if (!res.ok) {
+        if (res.status === 401) {
+          trackEvent(ANALYTICS_EVENTS.guestSaveBlocked, { page: "manual" });
+          setShowAuthModal(true);
+          return;
+        }
         const data = await res.json().catch(() => ({}));
         setError(data.detail || data.message || "保存失败，请稍后重试");
         return;
       }
+
+      trackEvent(ANALYTICS_EVENTS.wordSaveSuccess, {
+        page: "manual",
+        count: 1,
+        convertedFromGuest,
+      });
       router.refresh();
       // 清空表单，留在当前页继续录入
       setDisplayText(""); setLemma(""); setMeaningZh(""); setPhonetic("");
@@ -103,11 +124,25 @@ export default function ManualPage() {
     } finally { setSaving(false); }
   }
 
+  // 模态内注册/登录成功后：表单内容仍在，直接续接保存
+  async function handleAuthSuccess() {
+    setShowAuthModal(false);
+    setAuthedLocally(true);
+    await handleSave(true);
+  }
+
   return (
     <main className="container fade-in">
       <div className="card stack">
         <h1 className="title">手动录词</h1>
         <p className="subtitle">输入单词，系统会自动补全完整义项（含词性、释义、例句、熟词僻义）。</p>
+
+        {isGuest && !authedLocally && (
+          <GuestCta
+            message="登录后即可保存到词库，当前输入内容会保留"
+            onAuth={() => setShowAuthModal(true)}
+          />
+        )}
 
         <div>
           <label className="label">单词或短语</label>
@@ -218,10 +253,19 @@ export default function ManualPage() {
         {hint ? <p className="muted">{hint}</p> : null}
         {error ? <p className="muted">{error}</p> : null}
 
-        <button className="button" onClick={handleSave} disabled={saving}>
+        <button className="button" onClick={() => handleSave()} disabled={saving}>
           {saving ? "保存中..." : "保存到词库"}
         </button>
       </div>
+
+      <AuthModal
+        open={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={handleAuthSuccess}
+        title="保存前请先创建账号"
+        description="注册后当前输入的词条会直接存入你的词库，内容不会丢失。"
+        source="manual"
+      />
     </main>
   );
 }

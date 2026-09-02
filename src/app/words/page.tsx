@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useAuth } from "@/lib/use-auth";
+import GuestCta from "../ui/guest-cta";
 
 type WordItem = {
   id: string;
@@ -25,6 +27,10 @@ export default function WordsPage() {
   const [sort, setSort] = useState<SortValue>("created_desc");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [hint, setHint] = useState("");
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const { user, loading: authLoading, isGuest } = useAuth();
 
   async function handleAddToReview(wordId: string, displayText: string) {
     try {
@@ -45,23 +51,48 @@ export default function WordsPage() {
     sort,
   }).toString()}`;
 
-  async function loadWords(search = query, nextFilter = filter, nextSort = sort) {
-    setLoading(true);
-    setError("");
-
+  async function fetchPage(search: string, nextFilter: FilterValue, nextSort: SortValue, offset: number) {
     const params = new URLSearchParams({
       q: search,
       filter: nextFilter,
       sort: nextSort,
+      offset: String(offset),
+      limit: "50",
     });
-
     const res = await fetch(`/api/words/search?${params.toString()}`);
+    if (res.status === 401) {
+      return { items: [] as WordItem[], total: 0, hasMore: false };
+    }
     const data = await res.json();
+    return {
+      items: (data.items || []) as WordItem[],
+      total: data.total ?? 0,
+      hasMore: Boolean(data.hasMore),
+    };
+  }
 
-    const nextItems = data.items || [];
-    setItems(nextItems);
-    setSelectedIds((prev) => prev.filter((id) => nextItems.some((item: WordItem) => item.id === id)));
+  async function loadWords(search = query, nextFilter = filter, nextSort = sort) {
+    setLoading(true);
+    setError("");
+
+    const page = await fetchPage(search, nextFilter, nextSort, 0);
+
+    setItems(page.items);
+    setTotal(page.total);
+    setHasMore(page.hasMore);
+    setSelectedIds((prev) => prev.filter((id) => page.items.some((item) => item.id === id)));
     setLoading(false);
+  }
+
+  async function loadMore() {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+
+    const page = await fetchPage(query, filter, sort, items.length);
+    setItems((prev) => [...prev, ...page.items]);
+    setTotal(page.total);
+    setHasMore(page.hasMore);
+    setLoadingMore(false);
   }
 
   function toggleSelected(id: string) {
@@ -117,8 +148,37 @@ export default function WordsPage() {
   }
 
   useEffect(() => {
-    loadWords();
-  }, []);
+    if (isGuest) {
+      setLoading(false);
+      return;
+    }
+    if (user) loadWords();
+  }, [isGuest, user]);
+
+  if (authLoading) {
+    return (
+      <main className="container">
+        <div className="card">
+          <p className="muted">加载中...</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (isGuest) {
+    return (
+      <main className="container fade-in">
+        <div className="card empty-state">
+          <h1 className="empty-state-title">词库需要登录</h1>
+          <p className="empty-state-text">
+            登录后即可查看、搜索和管理你录入过的单词。<br />
+            拍照录词、手动录入、间隔复习，数据云端永久保存。
+          </p>
+          <GuestCta message="注册账号，拥有自己的专属词库" />
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="container">
@@ -190,12 +250,15 @@ export default function WordsPage() {
       <div className="page-block" />
 
       <div className="card">
-        <h2 className="section-title">词条列表</h2>
+        <h2 className="section-title">
+          词条列表
+          {!loading && total > 0 ? <span className="muted">（已显示 {items.length} / 共 {total} 条）</span> : null}
+        </h2>
 
         <div className="action-row">
           <div className="action-row-inline">
             <button className="button button-secondary" onClick={selectAllVisible} disabled={!items.length}>
-              全选当前结果
+              全选当前显示
             </button>
             <button
               className="button button-secondary"
@@ -259,6 +322,14 @@ export default function WordsPage() {
             </div>
           ))}
         </div>
+
+        {hasMore ? (
+          <div className="action-row">
+            <button className="button button-secondary" onClick={loadMore} disabled={loadingMore}>
+              {loadingMore ? "加载中..." : `加载更多（还剩 ${Math.max(total - items.length, 0)} 条）`}
+            </button>
+          </div>
+        ) : null}
       </div>
     </main>
   );

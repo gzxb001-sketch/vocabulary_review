@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { migrateDraftWords } from "@/lib/draft-migrate";
+import { ANALYTICS_EVENTS, trackEvent } from "@/lib/analytics";
 
 type Mode = "login" | "register" | "forgot";
 type ForgotStep = "request" | "reset";
@@ -17,6 +18,16 @@ export default function LoginPage() {
   const [notice, setNotice] = useState("");
   const [checking, setChecking] = useState(true);
   const [forgotStep, setForgotStep] = useState<ForgotStep>("request");
+  // 登录/注册成功后回跳的站内路径（?redirect=），默认首页
+  const [redirectTo, setRedirectTo] = useState("/");
+
+  useEffect(() => {
+    const raw = new URLSearchParams(window.location.search).get("redirect");
+    // 仅允许站内路径，防开放重定向
+    if (raw && raw.startsWith("/") && !raw.startsWith("//")) {
+      setRedirectTo(raw);
+    }
+  }, []);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -74,7 +85,8 @@ export default function LoginPage() {
         await migrateDraftWords();
       } catch {}
 
-      window.location.href = "/";
+      trackEvent(ANALYTICS_EVENTS.authSuccess, { mode, source: "login_page" });
+      window.location.href = redirectTo;
     } catch {
       setError("网络错误，请稍后重试");
     } finally {
@@ -170,8 +182,8 @@ export default function LoginPage() {
       <div className="card stack" style={{ maxWidth: 420, margin: "var(--space-8) auto" }}>
         <h1 className="title" style={{ textAlign: "center" }}>竹墨词库</h1>
         <p className="subtitle" style={{ textAlign: "center" }}>
-          {mode === "login" && "登录你的账号"}
-          {mode === "register" && "注册新账号"}
+          {mode === "login" && "登录你的账号，继续考研词汇冲刺"}
+          {mode === "register" && "注册新账号，开启考研词汇冲刺"}
           {mode === "forgot" && "重置密码"}
         </p>
 

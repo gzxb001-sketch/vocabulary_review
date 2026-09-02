@@ -1,8 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useDraftWordStore } from "@/store/draft-words";
+import { useAuth } from "@/lib/use-auth";
+import { ANALYTICS_EVENTS, trackEvent } from "@/lib/analytics";
+import GuestCta from "../ui/guest-cta";
+import AuthModal from "../ui/auth-modal";
+
+type MeaningEntry = {
+  partOfSpeech: string;
+  meaningZh: string;
+  exampleSentence?: string;
+  exampleTranslation?: string;
+  isObscure: boolean;
+  isHighFreq: boolean;
+};
 
 type EnrichItem = {
   text: string;
@@ -11,6 +24,24 @@ type EnrichItem = {
   phonetic?: string;
   partOfSpeech?: string;
   exampleSentence?: string;
+  meanings?: MeaningEntry[];
+  synonyms?: string[];
+};
+
+type SaveItem = {
+  displayText: string;
+  lemma: string;
+  meaningZh: string;
+  phonetic: string;
+  partOfSpeech: string;
+  exampleSentence: string;
+  synonyms: string[];
+  meanings: MeaningEntry[];
+  source: {
+    sourceType: string;
+    sourceNote: string;
+    sourceContext?: string;
+  };
 };
 
 export default function CaptureReviewPage() {
@@ -22,6 +53,13 @@ export default function CaptureReviewPage() {
   const [bulkSourceType, setBulkSourceType] = useState<"exam" | "reading" | "lecture" | "manual" | "longSentence" | "translation" | "other">("exam");
   const [bulkSourceNote, setBulkSourceNote] = useState("");
   const [manualInput, setManualInput] = useState("");
+  const { isGuest } = useAuth();
+
+  // 游客保存被 401 拦截时：缓存待存数据并弹出页内注册/登录模态，
+  // 成功后用缓存直接续存，不再重跑词典补全。
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authedLocally, setAuthedLocally] = useState(false);
+  const pendingSaveRef = useRef<SaveItem[] | null>(null);
 
   function setAllSelected(selected: boolean) {
     items.forEach((item) => { updateItem(item.tempId, { selected }); });
@@ -57,6 +95,32 @@ export default function CaptureReviewPage() {
     setManualInput("");
   }
 
+  async function saveItems(saveItemsPayload: SaveItem[]): Promise<boolean> {
+    const saveRes = await fetch("/api/words/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items: saveItemsPayload }),
+    });
+
+    if (!saveRes.ok) {
+      if (saveRes.status === 401) {
+        trackEvent(ANALYTICS_EVENTS.guestSaveBlocked, {
+          page: "capture_review",
+          wordCount: saveItemsPayload.length,
+        });
+        pendingSaveRef.current = saveItemsPayload;
+        setShowAuthModal(true);
+        return false;
+      }
+      const data = await saveRes.json().catch(() => ({}));
+      setError(data.detail || data.message || "保存失败");
+      return false;
+    }
+
+    pendingSaveRef.current = null;
+    return true;
+  }
+
   async function handleEnrichAndSave() {
     const selectedItems = items.filter((item) => item.selected && item.text.trim());
     if (!selectedItems.length) { setError("请至少保留一个候选词"); return; }
@@ -76,7 +140,7 @@ export default function CaptureReviewPage() {
       const enrichData = await enrichRes.json();
       const enrichedItems: EnrichItem[] = enrichData.items || [];
 
-      const saveItems = selectedItems.map((item) => {
+      const payload = selectedItems.map((item) => {
         const enriched = enrichedItems.find((entry) => entry.text === item.text);
         return {
           displayText: item.text.trim(),
@@ -91,21 +155,48 @@ export default function CaptureReviewPage() {
         };
       });
 
-      const saveRes = await fetch("/api/words/save", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: saveItems }),
+      const ok = await saveItems(payload);
+      if (!ok) return;
+
+      trackEvent(ANALYTICS_EVENTS.wordSaveSuccess, {
+        page: "capture_review",
+        count: payload.length,
+        convertedFromGuest: false,
       });
-
-      if (!saveRes.ok) {
-        const data = await saveRes.json().catch(() => ({}));
-        setError(data.detail || data.message || "保存失败");
-        return;
-      }
-
       clear();
       router.refresh();
       setHint("已保存！可继续录入。");
+    } catch {
+      setError("网络错误，请稍后重试");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // 模态内注册/登录成功后：用缓存的数据直接续存
+  async function handleAuthSuccess() {
+    setShowAuthModal(false);
+    setAuthedLocally(true);
+
+    const pending = pendingSaveRef.current;
+    if (!pending || pending.length === 0) return;
+
+    setError("");
+    setLoading(true);
+    try {
+      const ok = await saveItems(pending);
+      if (!ok) return;
+
+      trackEvent(ANALYTICS_EVENTS.wordSaveSuccess, {
+        page: "capture_review",
+        count: pending.length,
+        convertedFromGuest: true,
+      });
+      clear();
+      router.refresh();
+      setHint(`已保存 ${pending.length} 个词到你的词库！`);
+    } catch {
+      setError("网络错误，请稍后重试");
     } finally {
       setLoading(false);
     }
@@ -118,6 +209,13 @@ export default function CaptureReviewPage() {
         <p className="subtitle">
           OCR 识别结果如下。识别不准时，可在下方手动输入单词补充。
         </p>
+
+        {isGuest && !authedLocally && (
+          <GuestCta
+            message="登录后即可把识别结果保存到词库，已勾选的词会保留"
+            onAuth={() => setShowAuthModal(true)}
+          />
+        )}
 
         {items.length > 0 && (
           <div className="stack">
@@ -210,6 +308,15 @@ export default function CaptureReviewPage() {
           返回拍照
         </button>
       </div>
+
+      <AuthModal
+        open={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={handleAuthSuccess}
+        title="保存前请先创建账号"
+        description={`注册后这 ${items.filter((i) => i.selected).length || ""} 个识别结果会直接存入你的词库，当前内容不会丢失。`}
+        source="capture_review"
+      />
     </main>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import "./globals.css";
+import { IconAlertTriangle } from "./ui/icons";
 
 export default function GlobalError({
   error,

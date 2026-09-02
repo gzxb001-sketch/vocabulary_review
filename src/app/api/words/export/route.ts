@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { buildWordOrderBy, buildWordWhere, normalizeWordFilter, normalizeWordSort } from "@/lib/word-query";
+import { buildWordOrderBy, buildWordWhere, normalizeWordFilter, normalizeWordSort, sortWordsByNextReview } from "@/lib/word-query";
 import { prisma } from "@/lib/db";
 import { requireUserId, authError } from "@/lib/api-auth";
 
@@ -32,6 +32,8 @@ export async function GET(req: NextRequest) {
       orderBy: buildWordOrderBy(sort),
     });
 
+    const ordered = sort === "review_asc" ? sortWordsByNextReview(items) : items;
+
     const header = [
       "displayText", "lemma", "meaningZh", "phonetic", "partOfSpeech",
       "exampleSentence", "note", "status", "sourceTypes", "sourceNotes",
@@ -39,16 +41,16 @@ export async function GET(req: NextRequest) {
       "createdAt", "updatedAt",
     ];
 
-    const rows = items.map((item) => [
+    const rows = ordered.map((item) => [
       item.displayText, item.lemma, item.meaningZh, item.phonetic, item.partOfSpeech,
       item.exampleSentence, item.note, item.status,
       item.sources.map((s) => s.sourceType).join("; "),
       item.sources.map((s) => s.sourceNote || "").join("; "),
-      formatDate(item.schedule?.nextReviewAt),
-      item.schedule?.reviewCount ?? "",
-      item.schedule?.intervalDays ?? "",
-      item.schedule?.easeScore ?? "",
-      item.schedule?.lastResult ?? "",
+      formatDate(item.schedule[0]?.nextReviewAt),
+      item.schedule[0]?.reviewCount ?? "",
+      item.schedule[0]?.intervalDays ?? "",
+      item.schedule[0]?.easeScore ?? "",
+      item.schedule[0]?.lastResult ?? "",
       formatDate(item.createdAt), formatDate(item.updatedAt),
     ]);
 
