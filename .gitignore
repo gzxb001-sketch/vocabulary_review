@@ -16,3 +16,6 @@ prisma/dev.db-journal
 
 # 本地工具产物
 .workbuddy/
+
+.vercel
+.env*.local

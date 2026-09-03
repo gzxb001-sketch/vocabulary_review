@@ -159,12 +159,12 @@ prisma/
 
 4. 修改环境变量后需手动 **Redeploy** 才会生效。
 
-### 邮件提醒的定时触发（重要）
+### 邮件提醒的定时触发
 
-邮件提醒不会由进程内的 `setInterval` 常驻触发（在 Vercel 等 serverless 平台上该定时器会被冻结）。生产环境请选择其一：
+邮件提醒不会由进程内的 `setInterval` 常驻触发（在 Vercel 等 serverless 平台上该定时器会被冻结）。当前采用两层触发：
 
-- **Vercel Cron（已配置在 `vercel.json`）**：每分钟调用 `/api/email/send`。注意 Vercel **Hobby 计划不支持每分钟频率**（最低每天一次）——由于提醒采用「窗口匹配 + 当日去重」，Hobby 计划改为每天一次的 cron 也可以正常工作：把 cron 时刻设在用户提醒时刻之后即可（如 cron `0 12 * * *`（UTC 12:00 = 北京 20:00），则所有设定 20:00 及更早的用户都会在那一刻收到当天提醒）。
-- **cron-job.org 等外部服务**：每分钟 GET/POST 请求 `https://<你的域名>/api/email/send`，**必须携带 `Authorization: Bearer <CRON_SECRET>` 请求头**（生产环境未配置 CRON_SECRET 时该接口会拒绝请求）。
+- **主触发：cron-job.org 每分钟** GET/POST 请求 `https://<你的域名>/api/email/send`，必须携带 `Authorization: Bearer <CRON_SECRET>` 请求头（生产环境未配置 CRON_SECRET 时该接口会拒绝请求）。
+- **兜底触发：Vercel Cron 每天一次**（`vercel.json` 中 `0 12 * * *`，即北京时间 20:00）。Hobby 免费版只允许每天一次的 cron——**注意：更频繁的 cron 表达式会导致整个部署被 Vercel 拒绝**（历史教训：曾配置 `* * * * *` 导致连续多日无法部署）。窗口匹配 + 当日去重保证两层触发不会重复发信。
 
 **发送语义**：用户设定的提醒时刻是「最早发送时刻」而非精确时刻。cron 只要在该时刻之后到达（当天任意时间），提醒就会发出（每天最多一封，由 `emailLastSentAt` 去重）；错过精确分钟、cron 抖动或当天恢复后都会自动补发，发送失败会在下个周期重试。
 
