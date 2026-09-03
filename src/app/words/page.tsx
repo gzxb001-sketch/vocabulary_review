@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/use-auth";
+import { parseImportRows } from "@/lib/csv-import";
 import GuestCta from "../ui/guest-cta";
 
 type WordItem = {
@@ -31,6 +32,65 @@ export default function WordsPage() {
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const { user, loading: authLoading, isGuest } = useAuth();
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState("");
+
+  // CSV 导入：解析 → 分块调用 /api/words/save（自带去重与义项合并）→ 汇总结果
+  async function handleImportCsv(file: File) {
+    setError("");
+    setImportResult("");
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const rows = parseImportRows(text);
+      if (rows.length === 0) {
+        setError("未解析到任何词条。支持本产品导出的 CSV、或「单词,释义」/Tab 分隔的简单格式。");
+        return;
+      }
+
+      let saved = 0;
+      let duplicates = 0;
+      const CHUNK = 100;
+      for (let i = 0; i < rows.length; i += CHUNK) {
+        const chunk = rows.slice(i, i + CHUNK).map((row) => ({
+          displayText: row.displayText,
+          lemma: row.lemma,
+          meaningZh: row.meaningZh,
+          phonetic: row.phonetic,
+          partOfSpeech: row.partOfSpeech,
+          exampleSentence: row.exampleSentence,
+          note: row.note,
+          source: { sourceType: "manual" as const, sourceNote: "CSV 导入" },
+        }));
+        const res = await fetch("/api/words/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: chunk }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          if (res.status === 401) {
+            setError("请先登录后再导入");
+          } else {
+            setError(data.detail || data.message || "导入失败，请重试");
+          }
+          return;
+        }
+        const data = await res.json();
+        saved += data.saved || 0;
+        duplicates += data.duplicates || 0;
+      }
+
+      setImportResult(`导入完成：新增 ${saved} 个词，跳过重复 ${duplicates} 个。`);
+      loadWords();
+    } catch {
+      setError("读取文件失败，请重试");
+    } finally {
+      setImporting(false);
+      if (importInputRef.current) importInputRef.current.value = "";
+    }
+  }
 
   async function handleAddToReview(wordId: string, displayText: string) {
     try {
@@ -244,6 +304,30 @@ export default function WordsPage() {
             导出当前结果 CSV
           </a>
           <p className="muted">会导出当前搜索、筛选和排序下的全部词条，便于备份或迁移。</p>
+        </div>
+
+        <div className="action-row">
+          <button
+            className="link-button secondary"
+            onClick={() => importInputRef.current?.click()}
+            disabled={importing}
+          >
+            {importing ? "导入中..." : "导入 CSV / Anki 文本"}
+          </button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,.txt,text/csv,text/plain"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleImportCsv(f);
+            }}
+          />
+          <p className="muted">
+            支持本产品导出的 CSV、Anki 的 Tab 分隔文本，或每行一个「单词,释义」。重复词自动跳过并合并义项。
+          </p>
+          {importResult ? <p className="muted" style={{ color: "#16a34a" }}>{importResult}</p> : null}
         </div>
       </div>
 

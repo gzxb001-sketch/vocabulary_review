@@ -483,7 +483,10 @@ export default async function HomePage() {
         <section className="card card-compact mt-4">
           <div className="home-col-header">
             <h2 className="home-section-title">顽固词 · 集中攻克</h2>
-            <Link href="/words/stubborn" className="home-col-more">全部 →</Link>
+            <div className="home-col-actions">
+              <Link href="/review?mode=stubborn" className="home-col-more">专项攻克 →</Link>
+              <Link href="/words/stubborn" className="home-col-more">全部 →</Link>
+            </div>
           </div>
           <div className="home-tag-cloud">
             {data.stubbornWords.map((s) => (

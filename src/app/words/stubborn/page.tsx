@@ -63,6 +63,11 @@ export default function StubbornWordsPage() {
         <p className="subtitle">
           集中攻克反复模糊或忘记的词，逐个点进去强化学习
         </p>
+        {items.length > 0 && (
+          <Link href="/review?mode=stubborn" className="button" style={{ textAlign: "center" }}>
+            开始专项攻克（进入复习流，取最难 20 词）
+          </Link>
+        )}
       </div>
 
       {items.length === 0 ? (

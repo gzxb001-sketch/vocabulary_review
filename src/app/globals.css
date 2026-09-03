@@ -2555,3 +2555,11 @@ button svg {
 .home-stat-card.is-mastered .home-stat-num {
   color: var(--color-success);
 }
+
+
+/* 首页卡片头部多动作链接 */
+.home-col-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}

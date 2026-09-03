@@ -80,6 +80,7 @@ export default function ReviewPage() {
   const [pendingCount, setPendingCount] = useState(0);
   const [isOffline, setIsOffline] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
+  const [mode, setMode] = useState<"normal" | "stubborn">("normal");
   const [pausing, setPausing] = useState(false);
   const [showSessionBreak, setShowSessionBreak] = useState(false);
   const [wasEndedEarly, setWasEndedEarly] = useState(false);
@@ -93,7 +94,10 @@ export default function ReviewPage() {
   const [spellingInput, setSpellingInput] = useState("");
   const [spellingChecked, setSpellingChecked] = useState(false);
   const [spellingCorrect, setSpellingCorrect] = useState(false);
-  const SPELLING_INTERVAL = 5;
+  // 拼写验证：随机间隔触发（约每 3~6 个非忘词一次），避免固定节奏可被预期
+  const [nextSpellingAt, setNextSpellingAt] = useState(() => 3 + Math.floor(Math.random() * 4));
+  // 拼写只作练习反馈，单独统计，不写入 SRS 调度（拼写对错 ≠ 认不认识）
+  const [spellingStats, setSpellingStats] = useState({ right: 0, wrong: 0 });
   const LAST_SESSION_KEY = "zhumo_last_session";
   const MAX_RELEARN = 2; // 忘了的词在本会话内最多重学 2 次
 
@@ -120,8 +124,8 @@ export default function ReviewPage() {
   useEffect(() => {
     if (loading || isDemo || items.length === 0 || trackedStartRef.current) return;
     trackedStartRef.current = true;
-    trackEvent(ANALYTICS_EVENTS.reviewSessionStart, { wordCount: items.length });
-  }, [loading, isDemo, items.length]);
+    trackEvent(ANALYTICS_EVENTS.reviewSessionStart, { wordCount: items.length, mode });
+  }, [loading, isDemo, items.length, mode]);
 
   useEffect(() => {
     if (items.length === 0 || index < items.length || trackedCompleteRef.current) return;
@@ -136,8 +140,9 @@ export default function ReviewPage() {
       vague: sessionResults.vague,
       forgot: sessionResults.forgot,
       endedEarly: wasEndedEarly,
+      mode,
     });
-  }, [index, items.length, isDemo, sessionResults, wasEndedEarly]);
+  }, [index, items.length, isDemo, sessionResults, wasEndedEarly, mode]);
 
   // 复习完成时保存本轮数据
   useEffect(() => {
@@ -177,8 +182,12 @@ export default function ReviewPage() {
     let cancelled = false;
 
     async function load() {
+      // 专项攻克模式：?mode=stubborn，只刷顽固词（不缓存、无 demo 回退）
+      const attackMode = new URLSearchParams(window.location.search).get("mode") === "stubborn";
+      if (attackMode) setMode("stubborn");
+
       try {
-        const res = await fetch("/api/review/today");
+        const res = await fetch(attackMode ? "/api/review/stubborn" : "/api/review/today");
         if (!res.ok) throw new Error("fetch failed");
         const data: TodayResponse = await res.json();
         const list = (data.items || []) as ReviewItem[];
@@ -195,22 +204,30 @@ export default function ReviewPage() {
           }
           setIsOffline(false);
         }
-        // 缓存到 IndexedDB 备用
-        saveReviewItems(list);
+        // 缓存到 IndexedDB 备用（专项队列为动态生成，不缓存）
+        if (!attackMode) saveReviewItems(list);
       } catch {
-        // API 失败：先检查是否网络问题（离线缓存），否则就是游客（demo 模式）
-        const cached = (await getCachedReviewItems()) as ReviewItem[];
-        if (!cancelled && cached.length > 0) {
-          setItems(cached);
-          setPlanCount(cached.length);
-          setIsOffline(true);
-          setIsDemo(false);
-        } else if (!cancelled) {
-          // 游客模式：使用预置 demo 词库
-          setItems(DEMO_WORDS.map(demoToReviewItem));
-          setPlanCount(DEMO_WORDS.length);
-          setIsDemo(true);
-          setIsOffline(false);
+        if (attackMode) {
+          if (!cancelled) {
+            setItems([]);
+            setPlanCount(0);
+            setIsOffline(true);
+          }
+        } else {
+          // API 失败：先检查是否网络问题（离线缓存），否则就是游客（demo 模式）
+          const cached = (await getCachedReviewItems()) as ReviewItem[];
+          if (!cancelled && cached.length > 0) {
+            setItems(cached);
+            setPlanCount(cached.length);
+            setIsOffline(true);
+            setIsDemo(false);
+          } else if (!cancelled) {
+            // 游客模式：使用预置 demo 词库
+            setItems(DEMO_WORDS.map(demoToReviewItem));
+            setPlanCount(DEMO_WORDS.length);
+            setIsDemo(true);
+            setIsOffline(false);
+          }
         }
       }
       if (!cancelled) setLoading(false);
@@ -249,8 +266,8 @@ export default function ReviewPage() {
       if (!isForgot) {
         const nextCount = nonForgotCount + 1;
         setNonForgotCount(nextCount);
-        // 每 SPELLING_INTERVAL 个非忘词后触发一次拼写验证
-        if (nextCount % SPELLING_INTERVAL === 0 && !isDemo) {
+        // 到达随机阈值时触发一次拼写验证
+        if (!isDemo && nextCount >= nextSpellingAt) {
           setIsSpelling(true);
           setSpellingChecked(false);
           setSpellingInput("");
@@ -290,10 +307,10 @@ export default function ReviewPage() {
         setPausing(true);
       }
     },
-    [items, index, trySync, isDemo, nonForgotCount, relearnCount]
+    [items, index, trySync, isDemo, nonForgotCount, relearnCount, nextSpellingAt]
   );
 
-  // 拼写验证：用户输入单词后提交
+  // 拼写验证：用户输入单词后提交。只作练习反馈，不计入 SRS 调度。
   async function handleSpelling() {
     const current = items[index];
     if (!current) return;
@@ -304,26 +321,9 @@ export default function ReviewPage() {
     setSpellingChecked(true);
     setSpellingCorrect(isCorrect);
 
-    // 提交拼写结果（正确 → known，错误 → vague）
-    const result = isCorrect ? "known" : "vague";
-    setSessionResults((prev) => ({ ...prev, [result]: prev[result] + 1 }));
-
-    if (!isDemo) {
-      const clientResultId = newClientResultId();
-      try {
-        const res = await fetch("/api/review/submit", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ wordId: current.wordId, result, clientResultId }),
-        });
-        if (!res.ok) throw new Error("submit failed");
-        setIsOffline(false);
-      } catch {
-        await enqueueSubmit({ wordId: current.wordId, result, clientResultId });
-        setIsOffline(true);
-        await trySync();
-      }
-    }
+    setSpellingStats((prev) =>
+      isCorrect ? { ...prev, right: prev.right + 1 } : { ...prev, wrong: prev.wrong + 1 },
+    );
 
     // 1.5s 后自动进入下一词
     setTimeout(() => {
@@ -334,26 +334,11 @@ export default function ReviewPage() {
     }, 1500);
   }
 
-  // 跳过拼写（按"想不起来"处理）
+  // 跳过拼写（按「想不起来」处理，同样不计入 SRS）
   function skipSpelling() {
-    const current = items[index];
-    if (!current) return;
     setSpellingChecked(true);
     setSpellingCorrect(false);
-
-    setSessionResults((prev) => ({ ...prev, vague: prev.vague + 1 }));
-
-    if (!isDemo) {
-      const clientResultId = newClientResultId();
-      fetch("/api/review/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ wordId: current.wordId, result: "vague", clientResultId }),
-      }).catch(async () => {
-        await enqueueSubmit({ wordId: current.wordId, result: "vague", clientResultId });
-        await trySync();
-      });
-    }
+    setSpellingStats((prev) => ({ ...prev, wrong: prev.wrong + 1 }));
 
     setTimeout(() => {
       setIsSpelling(false);
@@ -399,12 +384,21 @@ export default function ReviewPage() {
   }
 
   if (!items.length) {
+    const isAttack = mode === "stubborn";
     return (
       <main className="container fade-in">
         <div className="card empty-state">
-          <span className="empty-state-icon"><IconCheckCircle /></span>
-          <h1 className="empty-state-title">今天没有待复习的词</h1>
-          <p className="empty-state-text">可以先去录入几个今天遇到的生词。</p>
+          <span className="empty-state-icon">
+            {isAttack ? <IconSparkles /> : <IconCheckCircle />}
+          </span>
+          <h1 className="empty-state-title">
+            {isAttack ? "暂时没有需要攻克的顽固词" : "今天没有待复习的词"}
+          </h1>
+          <p className="empty-state-text">
+            {isAttack
+              ? "坚持复习，顽固词池在缩小。继续按每日计划推进即可。"
+              : "可以先去录入几个今天遇到的生词。"}
+          </p>
           <div className="link-row">
             <Link href="/" className="link-button secondary">返回首页</Link>
           </div>
@@ -432,11 +426,13 @@ export default function ReviewPage() {
         ) : (
           <div className="card stack review-summary" style={{ textAlign: "center" }}>
             <span className="empty-state-icon">{wasEndedEarly ? <IconPause /> : <IconSparkles />}</span>
-            <h1 className="empty-state-title">{wasEndedEarly ? "复习已暂停" : "今天复习完成"}</h1>
+            <h1 className="empty-state-title">{wasEndedEarly ? "复习已暂停" : mode === "stubborn" ? "攻克完成" : "今天复习完成"}</h1>
             <p className="empty-state-text">
               {wasEndedEarly
                 ? `已完成 ${Math.min(index, planCount)}/${planCount} 个`
-                : `今日计划 ${planCount} 个词已全部完成`}
+                : mode === "stubborn"
+                  ? `本次 ${planCount} 个顽固词已全部过完，正确率见下方统计`
+                  : `今日计划 ${planCount} 个词已全部完成`}
               {items.length > planCount && (
                 <>
                   <br />
@@ -459,6 +455,16 @@ export default function ReviewPage() {
                 </div>
                 <div className="review-summary-chip forgot">
                   <IconX /> 不会 {sessionResults.forgot}
+                </div>
+              </div>
+            )}
+            {(spellingStats.right > 0 || spellingStats.wrong > 0) && (
+              <div className="review-summary-row">
+                <div className="review-summary-chip known">
+                  <IconCheckCircle /> 拼写对 {spellingStats.right}
+                </div>
+                <div className="review-summary-chip forgot">
+                  <IconXCircle /> 拼写错 {spellingStats.wrong}
                 </div>
               </div>
             )}
@@ -520,8 +526,16 @@ export default function ReviewPage() {
         <div className="progress-badge">{index + 1} / {items.length}</div>
         {planCount > 0 && (
           <p className="muted" style={{ textAlign: "center", fontSize: "var(--text-xs)", marginBottom: "var(--space-2)" }}>
-            今日计划 {planCount} 个 · 每 {REVIEW_CAPS.sessionSize} 个休息一次
+            {mode === "stubborn"
+              ? `本次攻克 ${planCount} 个顽固词 · 每 ${REVIEW_CAPS.sessionSize} 个休息一次`
+              : `今日计划 ${planCount} 个 · 每 ${REVIEW_CAPS.sessionSize} 个休息一次`}
           </p>
+        )}
+
+        {mode === "stubborn" && (
+          <div className="alert alert-info" style={{ textAlign: "center" }}>
+            专项攻克模式 · 只刷反复记不住的词，答题照常推进记忆曲线
+          </div>
         )}
 
         {isDemo && (

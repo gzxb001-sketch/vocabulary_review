@@ -12,6 +12,8 @@
 - **找回密码**：邮箱验证码重置密码（10 分钟有效、5 次尝试上限、发送冷却、防枚举）。
 - **提醒通知**：邮件提醒（QQ SMTP）与浏览器 Web Push 推送。
 - **学习统计**：每周趋势图、词库筛选、顽固词标记、掌握度（间隔 ≥21 天且最近一次为「认识」即视为已掌握）。
+- **专项攻克**：一键进入顽固词专项复习（取难度最高的 20 词），答题照常推进 SRS。
+- **导入导出**：CSV 导出备份；支持导入本产品导出的 CSV、Anki Tab 分隔文本或「单词,释义」简单格式，重复词自动跳过并合并义项。
 
 ## 技术栈
 
@@ -179,16 +181,16 @@ prisma/
 | `guest_save_blocked` | `page`, `wordCount` | 游客保存被 401 拦截（注册模态弹出的时刻），漏斗关键摩擦点 |
 | `auth_success` | `mode`, `source` | 注册/登录成功；`source` 区分页内模态（manual / capture_review）与登录页 |
 | `word_save_success` | `page`, `count`, `convertedFromGuest` | 词条保存成功；`convertedFromGuest=true` 表示注册后自动续存的首批词（激活信号） |
-| `review_session_start` | `wordCount` | 已登录用户开始一次复习会话 |
-| `review_session_complete` | `total`, `known`, `vague`, `forgot`, `endedEarly` | 一次复习会话结束（完成或提前结束） |
+| `review_session_start` | `wordCount`, `mode` | 已登录用户开始一次复习会话；`mode` 区分常规（normal）与专项攻克（stubborn） |
+| `review_session_complete` | `total`, `known`, `vague`, `forgot`, `endedEarly`, `mode` | 一次复习会话结束（完成或提前结束） |
 | `demo_session_complete` | — | 游客体验模式复习完成 |
 
 **北极星指标口径**：
 
 - **游客→注册转化率** = `auth_success(source 为 auth_modal)` / `guest_save_blocked`
 - **复习完成率（按天）** = `review_session_complete(endedEarly=false)` / `review_session_start` 的会话数
+- **顽固词攻克率** = 专项攻克会话（`mode=stubborn`）的 `review_session_complete` 中 known 占比
 - **D7 留存**：由 Vercel 面板按访客回访估算（页面自动上报 pageview）
-- **顽固词攻克率**：待「专项攻克模式」上线后补充事件
 
 开发环境不发数据：事件写入 `window.__zhumoEvents` 并打印到控制台，便于本地验证参数。
 
