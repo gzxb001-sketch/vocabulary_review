@@ -81,11 +81,11 @@
   --space-12: 48px;
 
   /* ======== 排版 ======== */
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
 
-  --text-xs: 0.8125rem;
-  --text-sm: 0.875rem;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
   --text-base: 0.9375rem;
   --text-md: 1rem;
   --text-lg: 1.0625rem;
@@ -1367,8 +1367,6 @@ textarea:focus-visible,
   letter-spacing: var(--tracking-tight);
   line-height: 1.15;
   word-break: break-word;
-  /* 英文单词用衬线字体：词典排版感，与界面中文的无衬线形成记忆锚点 */
-  font-family: Georgia, "Times New Roman", "Songti SC", serif;
 }
 
 .flashcard-reveal {
