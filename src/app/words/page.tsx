@@ -300,7 +300,7 @@ export default function WordsPage() {
         </div>
 
         <div className="action-row">
-          <a href={exportHref} className="link-button secondary" download>
+          <a href={exportHref} className="button button-secondary" download>
             导出当前结果 CSV
           </a>
           <p className="muted">会导出当前搜索、筛选和排序下的全部词条，便于备份或迁移。</p>
@@ -308,7 +308,7 @@ export default function WordsPage() {
 
         <div className="action-row">
           <button
-            className="link-button secondary"
+            className="button button-secondary"
             onClick={() => importInputRef.current?.click()}
             disabled={importing}
           >

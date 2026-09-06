@@ -84,8 +84,8 @@
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
 
-  --text-xs: 0.75rem;
-  --text-sm: 0.8125rem;
+  --text-xs: 0.8125rem;
+  --text-sm: 0.875rem;
   --text-base: 0.9375rem;
   --text-md: 1rem;
   --text-lg: 1.0625rem;
@@ -1367,6 +1367,8 @@ textarea:focus-visible,
   letter-spacing: var(--tracking-tight);
   line-height: 1.15;
   word-break: break-word;
+  /* 英文单词用衬线字体：词典排版感，与界面中文的无衬线形成记忆锚点 */
+  font-family: Georgia, "Times New Roman", "Songti SC", serif;
 }
 
 .flashcard-reveal {
@@ -2666,4 +2668,84 @@ button svg {
   font-weight: var(--font-semibold);
   color: var(--color-text-secondary);
   margin: 0;
+}
+
+
+/* ============================================================
+   暗色模式「夜竹」 — html.dark（ThemeInit 依系统偏好自动挂载）
+   ============================================================ */
+
+html.dark {
+  color-scheme: dark;
+
+  --color-primary: #84cc16;
+  --color-primary-dark: #a3e635;
+  --color-primary-light: #bef264;
+  --color-primary-lighter: #d9f99d;
+  --color-primary-bg: #1d2513;
+  --color-primary-border: #3a4a26;
+
+  --color-secondary: #a3e635;
+  --color-secondary-bg: #202a15;
+  --color-secondary-border: #465527;
+
+  --color-accent: #2dd4bf;
+  --color-accent-bg: #0f2622;
+  --color-accent-border: #1d4a42;
+
+  --color-success: #4ade80;
+  --color-success-light: #4ade80;
+  --color-success-bg: #11221a;
+  --color-success-border: #1e4433;
+
+  --color-warning: #fbbf24;
+  --color-warning-light: #fcd34d;
+  --color-warning-bg: #291f0e;
+  --color-warning-border: #55420f;
+  --color-warning-text: #fbbf24;
+
+  --color-danger: #f87171;
+  --color-danger-light: #fca5a5;
+  --color-danger-bg: #2b1517;
+  --color-danger-border: #572b2d;
+
+  --color-bg: #12160e;
+  --color-surface: #191f13;
+  --color-surface-solid: #191f13;
+  --color-surface-hover: #1e2518;
+  --color-surface-muted: #232a1b;
+
+  --color-text-primary: #eef2e8;
+  --color-text-secondary: #c6cec0;
+  --color-text-muted: #939e8e;
+  --color-text-placeholder: #6f7a6c;
+  --color-text-inverse: #12160a;
+
+  --color-border: #2b3323;
+  --color-border-strong: #3c4630;
+}
+
+/* 暗色下需要覆盖的写死浅色表面 */
+html.dark .topnav {
+  background: rgba(18, 22, 14, 0.88);
+  border-bottom-color: var(--color-border);
+}
+
+html.dark .bottom-nav {
+  background: rgba(18, 22, 14, 0.94);
+  border-top-color: var(--color-border);
+}
+
+html.dark .home-stat-card.is-due {
+  background: var(--color-danger-bg);
+}
+
+html.dark .summary-card:nth-child(3) {
+  background: var(--color-warning-bg);
+}
+
+html.dark body::before {
+  background:
+    radial-gradient(ellipse 70% 42% at 50% -8%, rgba(132, 204, 22, 0.07), transparent 60%),
+    radial-gradient(ellipse 45% 30% at 88% 22%, rgba(132, 204, 22, 0.04), transparent 55%);
 }

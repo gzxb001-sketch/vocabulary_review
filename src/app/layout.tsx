@@ -45,6 +45,13 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body>
+        {/* 主题初始化：跟随系统暗色偏好，在首帧前挂载 html.dark 避免闪烁 */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{if(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches){document.documentElement.classList.add('dark')}}catch(e){}",
+          }}
+        />
         <nav className="topnav" aria-label="主导航">
           <div className="topnav-inner">
             <Link href="/" className="topnav-brand" aria-label="回到首页">
