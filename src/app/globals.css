@@ -2637,3 +2637,33 @@ button svg {
   margin: 0 0 var(--space-3);
   position: relative;
 }
+
+
+/* ============================================================
+   学习数据合并卡 — 本周概览 + 认识率趋势 + 打卡记录
+   ============================================================ */
+
+.study-data-block {
+  padding-top: var(--space-2);
+  border-top: 1px dashed var(--color-border);
+}
+
+.study-data-block:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.study-data-subtitle-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.study-data-subtitle {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-secondary);
+  margin: 0;
+}

@@ -43,8 +43,8 @@ export function WeeklyTrendChart() {
   const linePath = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
 
   return (
-    <section className="card stack" style={{ marginBottom: "var(--space-4)", padding: "var(--space-4)" }}>
-      <h2 className="home-section-title">学习趋势</h2>
+    <div className="study-data-block">
+      <h3 className="study-data-subtitle">认识率趋势</h3>
       <svg viewBox={`0 0 ${width} ${height}`} style={{ width: "100%", height: "auto", maxHeight: "140px" }}>
         {/* 网格线 */}
         {[0, 25, 50, 75, 100].map((v) => {
@@ -71,6 +71,6 @@ export function WeeklyTrendChart() {
           ) : null
         )}
       </svg>
-    </section>
+    </div>
   );
 }

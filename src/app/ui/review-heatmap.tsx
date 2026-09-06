@@ -70,12 +70,9 @@ export function ReviewHeatmap() {
   }
 
   return (
-    <section
-      className="card stack"
-      style={{ marginBottom: "var(--space-4)", padding: "var(--space-4)" }}
-    >
-      <div className="home-col-header">
-        <h2 className="home-section-title">打卡记录</h2>
+    <div className="study-data-block">
+      <div className="study-data-subtitle-row">
+        <h3 className="study-data-subtitle">打卡记录</h3>
         <span className="muted" style={{ fontSize: "var(--text-xs)" }}>
           近 {weeks.length} 周 · 复习 {activeDays} 天 · 共 {totalReviews} 次
         </span>
@@ -163,6 +160,6 @@ export function ReviewHeatmap() {
           多
         </span>
       </div>
-    </section>
+    </div>
   );
 }

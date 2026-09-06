@@ -292,9 +292,6 @@ export default async function HomePage() {
         />
       )}
 
-      {/* 每日复习提醒 */}
-      {!isGuest && <EmailReminder />}
-
       {/* Stats */}
       {isGuest ? (
         <section className="home-stats-row">
@@ -379,36 +376,28 @@ export default async function HomePage() {
         <span className="bamboo-divider-icon" />
       </div>
 
-      {/* 本周复习效率（仅登录用户） */}
+      {/* 学习数据（仅登录用户）：本周概览 + 认识率趋势 + 打卡记录 */}
       {!isGuest && (
-        <section className="card card-compact mb-4">
-          <h2 className="home-section-title">本周复习</h2>
+        <section className="card study-data-card">
+          <div className="home-col-header">
+            <h2 className="home-section-title">学习数据</h2>
+          </div>
           <div className="stat-row">
             <div>
-              <span className="stat-num">
-                {data.weeklyTotalCount}
-              </span>
-              <span className="stat-unit">
-                次复习
-              </span>
+              <span className="stat-num">{data.weeklyTotalCount}</span>
+              <span className="stat-unit">次复习</span>
             </div>
             <div>
               <span className={`stat-num ${data.weeklyKnownRate >= 60 ? "is-good" : "is-warn"}`}>
                 {data.weeklyKnownRate}%
               </span>
-              <span className="stat-unit">
-                认识率
-              </span>
+              <span className="stat-unit">认识率</span>
             </div>
           </div>
+          <WeeklyTrendChart />
+          <ReviewHeatmap />
         </section>
       )}
-
-      {/* 学习趋势图（仅登录用户） */}
-      {!isGuest && <WeeklyTrendChart />}
-
-      {/* 打卡热力图（仅登录用户） */}
-      {!isGuest && <ReviewHeatmap />}
 
       {/* 最近 */}
       {isGuest ? (
@@ -515,6 +504,9 @@ export default async function HomePage() {
           </div>
         </section>
       )}
+
+      {/* 每日复习提醒 — 低频设置类信息，降权到页面尾部 */}
+      {!isGuest && <EmailReminder />}
 
       {/* 来源分布 — 仅登录用户 */}
       {!isGuest && data.sourceDistribution.length > 0 && (
