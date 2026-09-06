@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { Analytics } from "@vercel/analytics/next";
 import NavLinks from "./nav-links";
+import BottomNav from "./ui/bottom-nav";
 import ServiceWorkerRegister from "./ui/service-worker-register";
 
 export const metadata: Metadata = {
@@ -54,6 +55,7 @@ export default function RootLayout({
         </nav>
         {children}
         <ServiceWorkerRegister />
+        <BottomNav />
         <Analytics />
       </body>
     </html>

@@ -155,12 +155,17 @@ export default async function HomePage() {
   } catch (e: any) {
     return (
       <main className="container">
-        <div className="card">
-          <h1 className="title">竹墨词库</h1>
-          <p className="error-text pre-wrap">
-            用户查询失败: {String(e?.message || e)}
-          </p>
-          <a href="/login" className="button">重新登录</a>
+        <div className="card empty-state">
+          <span className="empty-state-icon">🎋</span>
+          <h1 className="empty-state-title">页面加载出了点问题</h1>
+          <p className="empty-state-text">可能是网络开小差了，请重试。</p>
+          <div className="link-row">
+            <a href="/" className="link-button">重试</a>
+          </div>
+          <details className="source-detail">
+            <summary className="source-detail-summary">技术详情</summary>
+            <p className="error-text pre-wrap">{String(e?.message || e)}</p>
+          </details>
         </div>
       </main>
     );
@@ -190,12 +195,17 @@ export default async function HomePage() {
   } catch (e: any) {
     return (
       <main className="container">
-        <div className="card">
-          <h1 className="title">竹墨词库</h1>
-          <p className="error-text pre-wrap">
-            数据加载失败: {String(e?.message || e)}
-          </p>
-          <a href="/login" className="button">重新登录</a>
+        <div className="card empty-state">
+          <span className="empty-state-icon">🎋</span>
+          <h1 className="empty-state-title">数据加载出了点问题</h1>
+          <p className="empty-state-text">可能是网络开小差了，请重试。</p>
+          <div className="link-row">
+            <a href="/" className="link-button">重试</a>
+          </div>
+          <details className="source-detail">
+            <summary className="source-detail-summary">技术详情</summary>
+            <p className="error-text pre-wrap">{String(e?.message || e)}</p>
+          </details>
         </div>
       </main>
     );
@@ -223,11 +233,16 @@ export default async function HomePage() {
       {isGuest ? (
         <section className="hero-card-home">
           <p className="hero-brand">竹墨词库</p>
-          <p className="hero-due-count">{DEMO_WORDS.length}</p>
-          <p className="hero-due-label">个考研预置词，免费体验</p>
-          <p className="hero-due-hint">拍照速录生词 · 间隔记忆 · 考前冲刺计划</p>
+          <h1 className="hero-guest-title">
+            考研生词
+            <br />
+            科学背牢
+          </h1>
+          <p className="hero-due-hint">
+            已备好 {DEMO_WORDS.length} 个高频考研词 · 1 分钟开始 · 无需注册
+          </p>
           <div className="hero-btns">
-            <Link href="/review" className="hero-btn-primary">开始体验</Link>
+            <Link href="/review" className="hero-btn-primary">立即体验</Link>
             <Link href="/login" className="hero-btn-secondary">注册账号</Link>
           </div>
         </section>
