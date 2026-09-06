@@ -8,6 +8,8 @@ const requestSchema = z.object({
     .array(
       z.object({
         text: z.string().min(1),
+        // 用户遇到该词的原句（可选）：用于语境选义排序
+        sourceContext: z.string().optional(),
       }),
     )
     .min(1),
@@ -22,15 +24,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: "invalid request body" }, { status: 400 });
     }
 
-    const texts = parsed.data.items.map((item) => normalizeText(item.text)).filter(Boolean);
+    const items = parsed.data.items
+      .map((item) => ({
+        text: normalizeText(item.text),
+        sourceContext: item.sourceContext || undefined,
+      }))
+      .filter((item) => Boolean(item.text));
 
-    if (!texts.length) {
+    if (!items.length) {
       return NextResponse.json({ message: "no valid items" }, { status: 400 });
     }
 
-    const items = await enrichWords(texts);
+    const enriched = await enrichWords(items);
 
-    return NextResponse.json({ items });
+    return NextResponse.json({ items: enriched });
   } catch (error) {
     console.error("enrich failed", error);
     return NextResponse.json({ message: "enrich failed" }, { status: 500 });

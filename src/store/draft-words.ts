@@ -5,6 +5,7 @@ export type DraftWord = {
   tempId: string;
   text: string;
   selected: boolean;
+  lowConfidence?: boolean;
   lemma?: string;
   meaningZh?: string;
   phonetic?: string;

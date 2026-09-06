@@ -2747,3 +2747,15 @@ html.dark body::before {
     radial-gradient(ellipse 70% 42% at 50% -8%, rgba(132, 204, 22, 0.07), transparent 60%),
     radial-gradient(ellipse 45% 30% at 88% 22%, rgba(132, 204, 22, 0.04), transparent 55%);
 }
+
+
+/* 低置信候选词标记 — OCR 把握不足的词提示人工核对 */
+.lowconf-tag {
+  margin-left: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-warning-text);
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-full);
+  padding: 1px 8px;
+}

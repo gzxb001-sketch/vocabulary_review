@@ -132,7 +132,10 @@ export default function CaptureReviewPage() {
       const enrichRes = await fetch("/api/words/enrich", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: selectedItems.map((item) => ({ text: item.text })) }),
+        // 传原句供语境选义：多义词优先给出贴合原文语境的义项
+        body: JSON.stringify({
+          items: selectedItems.map((item) => ({ text: item.text, sourceContext: item.sourceContext || undefined })),
+        }),
       });
 
       if (!enrichRes.ok) { setError("自动补全失败"); return; }
@@ -248,6 +251,7 @@ export default function CaptureReviewPage() {
                   <label className="checkbox-row">
                     <input type="checkbox" checked={item.selected} onChange={(e) => updateItem(item.tempId, { selected: e.target.checked })} />
                     <span>保留该词</span>
+                    {item.lowConfidence && <span className="lowconf-tag">⚠ 低置信 · 请核对拼写</span>}
                   </label>
 
                   <input className="input" value={item.text} onChange={(e) => updateItem(item.tempId, { text: e.target.value })} />

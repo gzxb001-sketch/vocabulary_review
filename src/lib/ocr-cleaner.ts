@@ -132,10 +132,14 @@ function extractContext(rawText: string, word: string): string | undefined {
 export type OcrCleanResult = {
   text: string;
   isVerified: boolean; // true = 在通用词库中找到，准确性高
+  lowConfidence?: boolean; // OCR 引擎对该词的置信度 < 60，建议人工核对
   sourceContext?: string; // 原句中包含该单词的那行文本
 };
 
-export function extractCandidatesFromRawText(rawText: string): OcrCleanResult[] {
+export function extractCandidatesFromRawText(
+  rawText: string,
+  wordConfidence?: Map<string, number>,
+): OcrCleanResult[] {
   const lines = rawText.split(/\r?\n/);
   const seen = new Map<string, OcrCleanResult>();
 
@@ -155,6 +159,9 @@ export function extractCandidatesFromRawText(rawText: string): OcrCleanResult[] 
       seen.set(key, {
         text: corrected,
         isVerified: isKnownWord(corrected),
+        lowConfidence: wordConfidence
+          ? (wordConfidence.get(lowerToken) ?? wordConfidence.get(key) ?? 100) < 60
+          : undefined,
         sourceContext: extractContext(rawText, token),
       });
     }
