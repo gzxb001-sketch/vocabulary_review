@@ -143,34 +143,37 @@ export default function CapturePage() {
     });
 
     // 白名单：只输出字母/连字符/空格，从源头减少数字与符号污染
-    await worker.setParameters({
-      tessedit_char_whitelist: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'- ",
-      preserve_interword_spaces: "1",
-    });
+    try {
+      await worker.setParameters({
+        tessedit_char_whitelist: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'- ",
+        preserve_interword_spaces: "1",
+      });
 
-    setProgress("识别中（整块模式）...");
-    await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_BLOCK });
-    const blockRun = await worker.recognize(processed, {}, { blocks: true, text: true });
+      setProgress("识别中（整块模式）...");
+      await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_BLOCK });
+      const blockRun = await worker.recognize(processed, {}, { blocks: true, text: true });
 
-    setProgress("识别中（稀疏模式）...");
-    await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT });
-    const sparseRun = await worker.recognize(processed, {}, { blocks: true, text: true });
-    await worker.terminate();
+      setProgress("识别中（稀疏模式）...");
+      await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT });
+      const sparseRun = await worker.recognize(processed, {}, { blocks: true, text: true });
 
-    const best = (sparseRun.data.confidence ?? 0) > (blockRun.data.confidence ?? 0) ? sparseRun : blockRun;
-    const confidence = best.data.confidence ?? 0;
-    const wordConf = buildWordConfidence(best.data as never);
+      const best = (sparseRun.data.confidence ?? 0) > (blockRun.data.confidence ?? 0) ? sparseRun : blockRun;
+      const wordConf = buildWordConfidence(best.data as never);
 
-    const candidates = extractCandidatesFromRawText(best.data.text || "", wordConf);
-    applyCandidates(
-      candidates.map((item) => ({
-        text: item.text,
-        isMarked: item.isVerified,
-        lowConfidence: item.lowConfidence,
-        sourceContext: item.sourceContext,
-      })),
-      Date.now(),
-    );
+      const candidates = extractCandidatesFromRawText(best.data.text || "", wordConf);
+      applyCandidates(
+        candidates.map((item) => ({
+          text: item.text,
+          isMarked: item.isVerified,
+          lowConfidence: item.lowConfidence,
+          sourceContext: item.sourceContext,
+        })),
+        Date.now(),
+      );
+    } finally {
+      // 任一步抛错也要释放 WASM worker，避免占用数百 MB 内存
+      await worker.terminate();
+    }
   }
 
   async function handleOcr() {
@@ -208,6 +211,8 @@ export default function CapturePage() {
 
         {preview && (
           <div style={{ textAlign: "center" }}>
+            {/* 本地 blob 预览：next/image 的远程优化无收益，直接用 img */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={preview}
               alt="预览"
