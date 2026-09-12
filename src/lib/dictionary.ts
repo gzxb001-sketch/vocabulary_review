@@ -144,7 +144,7 @@ function contentTokens(text?: string): Set<string> {
   );
 }
 
-function rankMeaningsByContext<T extends { gloss?: string; exampleSentence?: string }>(
+export function rankMeaningsByContext<T extends { gloss?: string; exampleSentence?: string }>(
   meanings: T[],
   context?: string | null,
 ): T[] {

@@ -86,3 +86,32 @@ describe("extractCandidatesFromRawText — 噪声与上下文", () => {
     expect(extractCandidatesFromRawText("   \n  ")).toHaveLength(0);
   });
 });
+
+describe("extractCandidatesFromRawText — 词级置信度", () => {
+  it("置信度 <60 的词标记 lowConfidence（含自动纠错后继承）", () => {
+    const conf = new Map([["sign1ficant", 40], ["significant", 45]]);
+    const out = extractCandidatesFromRawText("The sign1ficant result", conf);
+    const low = out.find((r) => r.text === "significant");
+    expect(low?.lowConfidence).toBe(true);
+  });
+
+  it("置信度 ≥60 或不在映射中的词不标记", () => {
+    const conf = new Map([["environment", 88], ["sig", 95]]);
+    const out = extractCandidatesFromRawText("The environment is significant", conf);
+    expect(out.find((r) => r.text === "environment")?.lowConfidence).toBe(false);
+    // significant 不在映射里：默认视为高置信（不标记）
+    expect(out.find((r) => r.text === "significant")?.lowConfidence).toBe(false);
+  });
+
+  it("不传置信度映射时 lowConfidence 为 undefined（兼容旧行为）", () => {
+    const out = extractCandidatesFromRawText("The environment is significant");
+    expect(out.every((r) => r.lowConfidence === undefined)).toBe(true);
+  });
+
+  it("纠错后的词继承原 token 的低置信状态", () => {
+    // "1mportant" 被自动纠错为 important，应继承 "1mportant" 的低置信
+    const conf = new Map([["1mportant", 35]]);
+    const out = extractCandidatesFromRawText("1mportant", conf);
+    expect(out.find((r) => r.text === "important")?.lowConfidence).toBe(true);
+  });
+});
