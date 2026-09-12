@@ -285,7 +285,7 @@ export default async function HomePage() {
       )}
 
       {/* 考前冲刺计划（仅登录用户） */}
-      {!isGuest && (
+      {user && (
         <ExamSprintCard
           examDate={user.examDate ? user.examDate.toISOString().slice(0, 10) : null}
           sprint={sprint}
