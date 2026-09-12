@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint .",
+    "lint": "eslint . --cache",
     "test": "vitest run",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push"

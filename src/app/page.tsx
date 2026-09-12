@@ -160,7 +160,7 @@ export default async function HomePage() {
           <h1 className="empty-state-title">页面加载出了点问题</h1>
           <p className="empty-state-text">可能是网络开小差了，请重试。</p>
           <div className="link-row">
-            <a href="/" className="link-button">重试</a>
+            <Link href="/" className="link-button">重试</Link>
           </div>
           <details className="source-detail">
             <summary className="source-detail-summary">技术详情</summary>
@@ -200,7 +200,7 @@ export default async function HomePage() {
           <h1 className="empty-state-title">数据加载出了点问题</h1>
           <p className="empty-state-text">可能是网络开小差了，请重试。</p>
           <div className="link-row">
-            <a href="/" className="link-button">重试</a>
+            <Link href="/" className="link-button">重试</Link>
           </div>
           <details className="source-detail">
             <summary className="source-detail-summary">技术详情</summary>
