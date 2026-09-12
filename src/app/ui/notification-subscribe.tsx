@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -13,18 +13,22 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   return outputArray;
 }
 
+// 能力探测专用订阅：浏览器能力在页面生命周期内不变，无需真正的订阅
+const subscribeNoop = () => () => {};
+
 export default function NotificationSubscribe() {
   const [subscribed, setSubscribed] = useState(false);
-  const [supported, setSupported] = useState(true);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [time, setTime] = useState("20:00");
+  // SSR 首帧按支持处理（与原初值 true 一致），hydration 后按客户端实际能力裁剪
+  const supported = useSyncExternalStore(
+    subscribeNoop,
+    () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window,
+    () => true,
+  );
 
   useEffect(() => {
-    const ok = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
-    setSupported(ok);
-    if (!ok) return;
-
     navigator.serviceWorker.ready
       .then((reg) => reg.pushManager.getSubscription())
       .then((sub) => setSubscribed(!!sub))

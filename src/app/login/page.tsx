@@ -18,16 +18,14 @@ export default function LoginPage() {
   const [notice, setNotice] = useState("");
   const [checking, setChecking] = useState(true);
   const [forgotStep, setForgotStep] = useState<ForgotStep>("request");
-  // 登录/注册成功后回跳的站内路径（?redirect=），默认首页
-  const [redirectTo, setRedirectTo] = useState("/");
-
-  useEffect(() => {
+  // 登录/注册成功后回跳的站内路径（?redirect=），默认首页。
+  // 懒初始化读取 URL；redirectTo 只用于跳转不参与渲染，SSR 与客户端初值不同不会引发 hydration 告警
+  const [redirectTo] = useState(() => {
+    if (typeof window === "undefined") return "/";
     const raw = new URLSearchParams(window.location.search).get("redirect");
     // 仅允许站内路径，防开放重定向
-    if (raw && raw.startsWith("/") && !raw.startsWith("//")) {
-      setRedirectTo(raw);
-    }
-  }, []);
+    return raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : "/";
+  });
 
   useEffect(() => {
     fetch("/api/auth/me")

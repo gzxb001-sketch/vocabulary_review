@@ -82,7 +82,9 @@ export default function ReviewPage() {
   const [isDemo, setIsDemo] = useState(false);
   const [mode, setMode] = useState<"normal" | "stubborn">("normal");
   const [pausing, setPausing] = useState(false);
-  const [showSessionBreak, setShowSessionBreak] = useState(false);
+  // 会话休息改为渲染期派生：到达 sessionSize 边界且该位置尚未休息过时展示，
+  // 「继续复习」记录已休息的位置，避免用 effect 驱动状态（级联渲染）
+  const [breakDismissedAt, setBreakDismissedAt] = useState<number | null>(null);
   const [wasEndedEarly, setWasEndedEarly] = useState(false);
   // 学习阶梯：忘了的词在本会话内重学，记录每个词已重学次数，避免无限循环
   const [relearnCount, setRelearnCount] = useState<Record<string, number>>({});
@@ -111,8 +113,10 @@ export default function ReviewPage() {
   } | null>(null);
 
   useEffect(() => {
+    // 挂载后再读 localStorage：SSR 首帧保持 null，避免 hydration mismatch
     try {
       const raw = localStorage.getItem(LAST_SESSION_KEY);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (raw) setLastSession(JSON.parse(raw));
     } catch {}
   }, []);
@@ -234,6 +238,8 @@ export default function ReviewPage() {
     }
 
     load();
+    // trySync 先 await 再 setState，不会同步触发级联渲染（规则保守误报）
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     trySync();
 
     // 监听网络恢复，自动同步
@@ -357,16 +363,12 @@ export default function ReviewPage() {
   }, [pausing]);
 
   // 每完成一个会话（50 张）暂停一次，避免注意力疲劳
-  useEffect(() => {
-    const size = REVIEW_CAPS.sessionSize;
-    if (index > 0 && index < items.length && index % size === 0 && !isDemo) {
-      setShowSessionBreak(true);
-    }
-  }, [index, items.length, isDemo]);
+  const atSessionBoundary =
+    !isDemo && index > 0 && index < items.length && index % REVIEW_CAPS.sessionSize === 0;
+  const showSessionBreak = atSessionBoundary && breakDismissedAt !== index;
 
   // 提前结束本轮
   function endSession() {
-    setShowSessionBreak(false);
     setWasEndedEarly(true);
     setIndex(items.length);
   }
@@ -504,7 +506,7 @@ export default function ReviewPage() {
             已完成 {index} / {items.length} 个，休息一下再继续吧。
           </p>
           <div className="link-row">
-            <button className="link-button" onClick={() => setShowSessionBreak(false)}>
+            <button className="link-button" onClick={() => setBreakDismissedAt(index)}>
               继续复习
             </button>
             <button className="link-button secondary" onClick={endSession}>

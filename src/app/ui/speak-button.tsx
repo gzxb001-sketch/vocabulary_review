@@ -1,13 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
+
+// 能力探测专用订阅：浏览器能力在页面生命周期内不变，无需真正的订阅
+const subscribeNoop = () => () => {};
 
 export default function SpeakButton({ text, className }: { text: string; className?: string }) {
-  const [supported, setSupported] = useState(false);
-
-  useEffect(() => {
-    setSupported(typeof window !== "undefined" && "speechSynthesis" in window);
-  }, []);
+  // SSR 首帧返回 false（渲染为空），hydration 后按客户端能力显示；替代 effect 里同步 setState
+  const supported = useSyncExternalStore(
+    subscribeNoop,
+    () => "speechSynthesis" in window,
+    () => false,
+  );
 
   if (!supported) return null;
 

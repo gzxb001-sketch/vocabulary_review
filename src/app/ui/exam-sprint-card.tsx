@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ANALYTICS_EVENTS, trackEvent } from "@/lib/analytics";
 import { getSprintInfo, type SprintInfo } from "@/lib/sprint";
@@ -25,10 +25,12 @@ export default function ExamSprintCard({
   // 本地覆盖：undefined = 未修改（跟随服务端数据），string = 已设置，null = 已清除
   const [localDate, setLocalDate] = useState<string | null | undefined>(undefined);
 
-  // 服务端数据刷新后清除本地覆盖
-  useEffect(() => {
+  // 服务端数据刷新后清除本地覆盖（渲染期随 props 调整 state，替代 effect 级联渲染）
+  const [prevExamDate, setPrevExamDate] = useState(examDate);
+  if (examDate !== prevExamDate) {
+    setPrevExamDate(examDate);
     setLocalDate(undefined);
-  }, [examDate]);
+  }
 
   const displayDate = localDate === undefined ? examDate : localDate;
   const displaySprint = displayDate

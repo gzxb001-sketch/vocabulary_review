@@ -46,13 +46,15 @@ export default function AuthModal({
     };
   }, [open, onClose]);
 
-  // 每次打开重置输入与错误状态
-  useEffect(() => {
+  // 每次打开重置输入与错误状态（渲染期随 props 调整 state，替代 effect 级联渲染）
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
     if (open) {
       setError("");
       setPassword("");
     }
-  }, [open]);
+  }
 
   if (!open) return null;
 

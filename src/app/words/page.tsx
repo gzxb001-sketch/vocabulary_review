@@ -208,12 +208,11 @@ export default function WordsPage() {
   }
 
   useEffect(() => {
-    if (isGuest) {
-      setLoading(false);
-      return;
-    }
+    // 仅在 user 就绪后首载一次；query/filter/sort 变更由搜索/筛选控件显式调用 loadWords
+    // 游客不进入主列表（渲染层直接返回登录引导），无需关心 loading
     if (user) loadWords();
-  }, [isGuest, user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   if (authLoading) {
     return (
