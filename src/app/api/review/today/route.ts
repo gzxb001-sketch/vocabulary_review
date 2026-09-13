@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireUserId, authError } from "@/lib/api-auth";
 import { REVIEW_CAPS } from "@/lib/review-config";
 import { getSprintInfo } from "@/lib/sprint";
+import { getReviewProgress } from "@/lib/stats";
 
 export async function GET() {
   let userId: string;
@@ -29,6 +30,9 @@ export async function GET() {
   // 冲刺模式：按考试日期动态调整每日配额（未设置则用常规配额）
   const sprint = getSprintInfo(user?.examDate, now);
 
+  // 今日进度（北京时区日边界，与首页共用口径）：今日计划一天内不缩小
+  const progress = await getReviewProgress(userId, sprint.caps, now);
+
   // 新词（从未复习）按录入时间最早优先，受每日新词上限控制
   const newItems = due
     .filter((s) => s.reviewCount === 0)
@@ -50,6 +54,8 @@ export async function GET() {
       newCount: newItems.length,
       reviewCount: reviewItems.length,
       remainingDue: due.length - selected.length,
+      reviewedToday: progress.reviewedToday,
+      todayPlan: progress.todayPlan,
       caps: { ...REVIEW_CAPS, ...sprint.caps },
       sprint: {
         phase: sprint.phase,

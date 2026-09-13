@@ -51,7 +51,12 @@ const SOURCE_LABELS: Record<string, string> = {
   exam: "真题", reading: "阅读", lecture: "听课", manual: "手动", other: "其他",
 };
 
-type TodayResponse = { count: number; items: ReviewItem[] };
+type TodayResponse = {
+  count: number;
+  items: ReviewItem[];
+  reviewedToday?: number;
+  todayPlan?: number;
+};
 
 function demoToReviewItem(d: DemoReviewItem): ReviewItem {
   return {
@@ -100,6 +105,10 @@ export default function ReviewPage() {
   const [breakDismissedAt, setBreakDismissedAt] = useState<number | null>(null);
   // 会话接续：从存档恢复的位置（null = 全新会话）
   const [resumeFrom, setResumeFrom] = useState<number | null>(null);
+  // 今日进度（来自 /api/review/today，北京时区口径，与首页一致）
+  const [todayMeta, setTodayMeta] = useState<{ reviewedToday: number; todayPlan: number } | null>(null);
+  // 本会话新作答的词（今日已完成 = reviewedToday + 这里去重后的新增）
+  const [todayAnswered, setTodayAnswered] = useState<Set<string>>(() => new Set());
   const [wasEndedEarly, setWasEndedEarly] = useState(false);
   // 学习阶梯：忘了的词在本会话内重学，记录每个词已重学次数，避免无限循环
   const [relearnCount, setRelearnCount] = useState<Record<string, number>>({});
@@ -275,6 +284,11 @@ export default function ReviewPage() {
             setItems(list);
             setPlanCount(list.length);
             setIsDemo(false);
+            setTodayMeta(
+              data.reviewedToday != null && data.todayPlan != null
+                ? { reviewedToday: data.reviewedToday, todayPlan: data.todayPlan }
+                : null,
+            );
             tryRestoreSession(list, attackMode ? "stubborn" : "normal");
           } else {
             // 已登录但无待复习词：不降级到 demo，展示空状态
@@ -375,6 +389,13 @@ export default function ReviewPage() {
       const clientResultId = newClientResultId();
       await enqueueSubmit({ wordId: current.wordId, result, clientResultId });
       setPendingCount((prev) => prev + 1);
+      // 今日进度（去重）：同一词的会话内重学不重复计
+      setTodayAnswered((prev) => {
+        if (prev.has(current.wordId)) return prev;
+        const next = new Set(prev);
+        next.add(current.wordId);
+        return next;
+      });
       void trySync();
 
       // 忘了：学习阶梯——本会话内重学（最多 MAX_RELEARN 次），再展示「再看看」
@@ -604,7 +625,13 @@ export default function ReviewPage() {
           <p className="muted" style={{ textAlign: "center", fontSize: "var(--text-xs)", marginBottom: "var(--space-2)" }}>
             {mode === "stubborn"
               ? `本次攻克 ${planCount} 个顽固词 · 每 ${REVIEW_CAPS.sessionSize} 个休息一次`
-              : `今日计划 ${planCount} 个 · 每 ${REVIEW_CAPS.sessionSize} 个休息一次`}
+              : `本轮 ${planCount} 个词 · 每 ${REVIEW_CAPS.sessionSize} 个休息一次`}
+            {todayMeta && mode !== "stubborn"
+              ? ` · 今日已完成 ${Math.min(
+                  todayMeta.reviewedToday + todayAnswered.size,
+                  todayMeta.todayPlan,
+                )} / ${todayMeta.todayPlan}`
+              : ""}
           </p>
         )}
 

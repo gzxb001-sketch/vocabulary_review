@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getUserIdFromCookies } from "@/lib/auth";
-import { calculateStreak, countMasteredWords } from "@/lib/stats";
+import { calculateStreak, countMasteredWords, getReviewProgress, userDayStart } from "@/lib/stats";
 import { getSprintInfo, type SprintInfo } from "@/lib/sprint";
 import { WeeklyTrendChart } from "./weekly-trend-chart";
 import { ReviewHeatmap } from "./ui/review-heatmap";
@@ -13,21 +13,16 @@ import { DEMO_WORDS } from "@/lib/demo-words";
 
 export const dynamic = "force-dynamic";
 
-async function getHomeData(userId: string, sprint: SprintInfo) {
+async function getHomeData(userId: string, caps: { newPerDay: number; reviewPerDay: number }) {
   try {
     const now = new Date();
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    const endOfToday = new Date(startOfToday);
-    endOfToday.setDate(endOfToday.getDate() + 1);
+    const startOfToday = userDayStart(now);
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
     const [
       totalWordsCount,
-      dueNewCount,
-      dueReviewCount,
+      progress,
       todayAddedCount,
-      todayReviewedCount,
       recentWords,
       recentReviews,
       sourceDistribution,
@@ -37,18 +32,10 @@ async function getHomeData(userId: string, sprint: SprintInfo) {
       masteredCount,
     ] = await Promise.all([
       prisma.word.count({ where: { userId } }),
-      // 到期词拆分统计：新词/旧词分别受冲刺配额约束，与 /api/review/today 一致
-      prisma.reviewSchedule.count({
-        where: { userId, nextReviewAt: { lte: now }, reviewCount: 0 },
-      }),
-      prisma.reviewSchedule.count({
-        where: { userId, nextReviewAt: { lte: now }, reviewCount: { gt: 0 } },
-      }),
+      // 今日复习进度（reviewedToday 去重词数 / todayPlan 日初口径不缩水），与复习页共用
+      getReviewProgress(userId, caps, now),
       prisma.word.count({
         where: { userId, createdAt: { gte: startOfToday } },
-      }),
-      prisma.review.count({
-        where: { userId, reviewedAt: { gte: startOfToday, lt: endOfToday } },
       }),
       prisma.word.findMany({
         where: { userId },
@@ -92,19 +79,16 @@ async function getHomeData(userId: string, sprint: SprintInfo) {
     // 连续打卡天数（共享实现，与 /api/stats/weekly 保持一致）
     const streak = await calculateStreak(userId, now);
 
-    const dueCount = dueNewCount + dueReviewCount;
-    const todayPlan =
-      Math.min(dueNewCount, sprint.caps.newPerDay) +
-      Math.min(dueReviewCount, sprint.caps.reviewPerDay);
-    const remainingDue = Math.max(0, dueCount - todayPlan);
+    const dueCount = progress.dueNewNow + progress.dueReviewNow;
+    const remainingDue = Math.max(0, dueCount - progress.todayPlan);
 
     return {
       totalWordsCount,
       dueCount,
-      todayPlan,
+      todayPlan: progress.todayPlan,
       remainingDue,
       todayAddedCount,
-      todayReviewedCount,
+      reviewedToday: progress.reviewedToday,
       recentWords,
       recentReviews,
       sourceDistribution,
@@ -122,7 +106,7 @@ async function getHomeData(userId: string, sprint: SprintInfo) {
       todayPlan: 0,
       remainingDue: 0,
       todayAddedCount: 0,
-      todayReviewedCount: 0,
+      reviewedToday: 0,
       recentWords: [],
       recentReviews: [],
       sourceDistribution: [],
@@ -175,14 +159,14 @@ export default async function HomePage() {
   const sprint = getSprintInfo(user?.examDate);
   try {
     data = userId
-      ? await getHomeData(userId, sprint)
+      ? await getHomeData(userId, sprint.caps)
       : {
           totalWordsCount: 0,
           dueCount: 0,
           todayPlan: 0,
           remainingDue: 0,
           todayAddedCount: 0,
-          todayReviewedCount: 0,
+          reviewedToday: 0,
           recentWords: [],
           recentReviews: [],
           sourceDistribution: [],
@@ -262,7 +246,7 @@ export default async function HomePage() {
               <p className="hero-due-count">{data.todayPlan}</p>
               <p className="hero-due-label">个词 · 今日计划</p>
               <p className="hero-due-hint">
-                今日已复习 {data.todayReviewedCount} / {data.todayPlan}
+                今日已复习 {data.reviewedToday} / {data.todayPlan} 个词
                 {data.remainingDue > 0
                   ? ` · 还有 ${data.remainingDue} 个往期词顺延到之后`
                   : " · 完成后即可休息"}
@@ -336,7 +320,7 @@ export default async function HomePage() {
             <span className="home-stat-label">今日新增</span>
           </div>
           <div className="home-stat-card">
-            <span className="home-stat-num">{data.todayReviewedCount}</span>
+            <span className="home-stat-num">{data.reviewedToday}</span>
             <span className="home-stat-label">今日复习</span>
           </div>
         </section>
