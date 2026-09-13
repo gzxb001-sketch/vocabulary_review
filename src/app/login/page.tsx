@@ -15,9 +15,14 @@ export default function LoginPage() {
   const [newPassword, setNewPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [checking, setChecking] = useState(true);
   const [forgotStep, setForgotStep] = useState<ForgotStep>("request");
+  // 凭证过期被引导回来时（?expired=1）给出明确提示，而不是让用户疑惑为何要重新登录
+  const [notice, setNotice] = useState(() =>
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("expired")
+      ? "登录已过期，请重新登录"
+      : "",
+  );
   // 登录/注册成功后回跳的站内路径（?redirect=），默认首页。
   // 懒初始化读取 URL；redirectTo 只用于跳转不参与渲染，SSR 与客户端初值不同不会引发 hydration 告警
   const [redirectTo] = useState(() => {
@@ -273,6 +278,7 @@ export default function LoginPage() {
             ) : null}
 
             {error ? <p className="auth-error">{error}</p> : null}
+            {notice ? <p className="auth-notice">{notice}</p> : null}
 
             <button className="button" onClick={handleAuth} disabled={loading}>
               {loading ? "处理中..." : mode === "login" ? "登录" : "注册"}
