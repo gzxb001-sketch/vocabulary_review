@@ -1,20 +1,9 @@
 import { COMMON_DICT } from "@/lib/common-dict";
+import { OCR_STOPWORDS as STOPWORDS } from "@/lib/stopwords";
 
 function normalizeSpaces(text: string) {
   return text.replace(/\s+/g, " ").trim();
 }
-
-// 停用词：常见虚词/代词/助动词，整句 OCR 时不作为候选词，避免刷屏。
-const STOPWORDS = new Set<string>([
-  "the", "a", "an", "of", "and", "or", "to", "in", "is", "are", "was", "were",
-  "be", "been", "being", "for", "with", "as", "at", "by", "on", "from",
-  "it", "its", "that", "this", "these", "those", "there", "here",
-  "he", "she", "they", "we", "you", "i", "me", "my", "his", "her", "our", "their", "them",
-  "not", "no", "but", "if", "so", "than", "then", "will", "would", "can", "could",
-  "should", "may", "might", "must", "shall", "have", "has", "had", "do", "does", "did",
-  "what", "which", "who", "whom", "whose", "when", "where", "why", "how",
-  "also", "very", "just", "only", "more", "most", "some", "any", "each", "every",
-]);
 
 // 数字 → 字母 混淆映射（OCR 最常见的错误类别：把 l/o/s 等识别成数字）
 const DIGIT_CONFUSIONS: Record<string, string[]> = {

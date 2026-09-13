@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { setAuthCookie } from "@/lib/auth";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { EMAIL_RE } from "@/lib/validate";
 
 // 注册限流：同一 IP 1 小时内最多 10 次注册，防止批量注册垃圾账号
 const REGISTER_MAX_ATTEMPTS = 10;
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
 
     const normalizedEmail = email.trim().toLowerCase();
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    if (!EMAIL_RE.test(normalizedEmail)) {
       return NextResponse.json({ message: "邮箱格式不正确" }, { status: 400 });
     }
 

@@ -2,6 +2,7 @@ import { normalizeLemma, normalizeText } from "@/lib/normalize";
 import { getKaoyanEntry } from "@/lib/kaoyan-words";
 import { COMMON_DICT, CommonDictEntry } from "@/lib/common-dict";
 import { lookupEcdict, ecdictMeanings } from "@/lib/ecdict";
+import { EN_STOPWORDS } from "@/lib/stopwords";
 
 /* ---- 带超时的 fetch 封装（Vercel serverless 有 10s 限制） ---- */
 
@@ -125,17 +126,6 @@ async function translate(text: string): Promise<string> {
    打分依据：原句内容词 与（义项英文释义 + 例句）的内容词重合度。
    例：在 "The paper was abandoned halfway" 里遇到的 abandon，
    「中止/放弃（计划）」义项的例句词面与原句重合度高，会排到「放纵」前面。 */
-
-const EN_STOPWORDS = new Set([
-  "the", "a", "an", "and", "or", "but", "if", "then", "than", "so", "as", "at", "by", "for", "with", "about",
-  "into", "onto", "from", "to", "in", "on", "of", "is", "are", "was", "were", "be", "been", "being", "am",
-  "have", "has", "had", "do", "does", "did", "will", "would", "shall", "should", "can", "could", "may",
-  "might", "must", "not", "no", "nor", "it", "its", "this", "that", "these", "those", "there", "here",
-  "he", "she", "they", "we", "you", "i", "me", "him", "her", "us", "them", "his", "their", "our", "your",
-  "what", "which", "who", "whom", "whose", "when", "where", "why", "how", "also", "very", "just", "only",
-  "more", "most", "some", "any", "each", "every", "all", "both", "such", "one", "two", "other", "another",
-  "up", "down", "out", "over", "under", "between", "because", "while", "after", "before",
-]);
 
 function contentTokens(text?: string): Set<string> {
   if (!text) return new Set();

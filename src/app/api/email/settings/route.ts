@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireUserId, authError } from "@/lib/api-auth";
+import { clampInt } from "@/lib/validate";
 
 export async function GET() {
   let userId: string;
@@ -53,11 +54,4 @@ export async function POST(req: Request) {
   await prisma.user.update({ where: { id: userId }, data });
 
   return NextResponse.json({ ok: true });
-}
-
-function clampInt(value: unknown, min: number, max: number): number | null {
-  if (value === undefined || value === null) return null;
-  const n = Number(value);
-  if (!Number.isFinite(n)) return null;
-  return Math.min(max, Math.max(min, Math.round(n)));
 }

@@ -3,8 +3,8 @@ import { randomInt } from "crypto";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { sendEmail } from "@/lib/mailer";
+import { EMAIL_RE } from "@/lib/validate";
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CODE_TTL_MS = 10 * 60 * 1000; // 验证码 10 分钟过期
 const RESEND_COOLDOWN_MS = 60 * 1000; // 同一邮箱 60 秒内只能发一次
 

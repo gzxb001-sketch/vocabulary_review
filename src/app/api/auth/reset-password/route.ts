@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { clearAuthCookie } from "@/lib/auth";
+import { EMAIL_RE } from "@/lib/validate";
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_ATTEMPTS = 5; // 验证码最多尝试 5 次，超过即作废
 
 export async function POST(req: NextRequest) {
