@@ -9,6 +9,7 @@ import {
   getCachedReviewItems,
   enqueueSubmit,
   syncQueue,
+  resumeIndex,
 } from "@/lib/review-offline";
 import { DEMO_WORDS, type DemoReviewItem } from "@/lib/demo-words";
 import { REVIEW_CAPS } from "@/lib/review-config";
@@ -72,6 +73,18 @@ function newClientResultId(): string {
     : `${Date.now()}_${Math.random().toString(36).slice(2)}`;
 }
 
+const SESSION_KEY = "zhumo-review-session";
+
+// 会话进度存档：按「日期 + 词表 wordId + 已答位置」持久化，重开页面可接续
+type SavedSession = {
+  date: string; // 存档日期（存取两端一致即可）
+  mode: "normal" | "stubborn";
+  items: string[]; // 会话词表的 wordId（含重学追加的重复项）
+  index: number; // 已答到的位置（items 前缀即已答词）
+  sessionResults: { known: number; vague: number; forgot: number };
+  relearnCount: Record<string, number>;
+};
+
 export default function ReviewPage() {
   const [items, setItems] = useState<ReviewItem[]>([]);
   const [index, setIndex] = useState(0);
@@ -85,6 +98,8 @@ export default function ReviewPage() {
   // 会话休息改为渲染期派生：到达 sessionSize 边界且该位置尚未休息过时展示，
   // 「继续复习」记录已休息的位置，避免用 effect 驱动状态（级联渲染）
   const [breakDismissedAt, setBreakDismissedAt] = useState<number | null>(null);
+  // 会话接续：从存档恢复的位置（null = 全新会话）
+  const [resumeFrom, setResumeFrom] = useState<number | null>(null);
   const [wasEndedEarly, setWasEndedEarly] = useState(false);
   // 学习阶梯：忘了的词在本会话内重学，记录每个词已重学次数，避免无限循环
   const [relearnCount, setRelearnCount] = useState<Record<string, number>>({});
@@ -167,6 +182,29 @@ export default function ReviewPage() {
     } catch {}
   }, [index, items.length, isDemo, sessionResults]);
 
+  // 会话进度存档：每答一题写入，重开页面可接续；本轮完成时清档
+  // （此时服务端列表已收缩，下次自然从新列表的第一个词开始）
+  useEffect(() => {
+    if (loading || isDemo || items.length === 0) return;
+    if (index >= items.length) {
+      try {
+        localStorage.removeItem(SESSION_KEY);
+      } catch {}
+      return;
+    }
+    const payload: SavedSession = {
+      date: new Date().toISOString().slice(0, 10),
+      mode,
+      items: items.map((i) => i.wordId),
+      index,
+      sessionResults,
+      relearnCount,
+    };
+    try {
+      localStorage.setItem(SESSION_KEY, JSON.stringify(payload));
+    } catch {}
+  }, [loading, isDemo, items, index, mode, sessionResults, relearnCount]);
+
   // 计算本次与上次的对比
   function getSessionComparison() {
     if (!lastSession || lastSession.known === undefined) return null;
@@ -181,6 +219,43 @@ export default function ReviewPage() {
     const { remaining } = await syncQueue();
     setPendingCount(remaining);
   }, []);
+
+  // —— 会话进度接续 ——
+  // 存档按 wordId 对齐而不是按 index 硬套：
+  // - 队列尚未同步（列表未收缩）→ 直接恢复到上次的位置
+  // - 队列已同步（列表已收缩）→ 跳过已答词，从第一个未答词继续
+  function tryRestoreSession(list: ReviewItem[], sessionMode: "normal" | "stubborn") {
+    let saved: SavedSession | null = null;
+    try {
+      const raw = localStorage.getItem(SESSION_KEY);
+      if (raw) saved = JSON.parse(raw) as SavedSession;
+    } catch {}
+    if (!saved || saved.date !== new Date().toISOString().slice(0, 10)) return;
+    if (saved.mode !== sessionMode || !saved.items?.length) return;
+
+    const restoredIndex = resumeIndex(
+      list.map((w) => w.wordId),
+      saved.items,
+      saved.index,
+    );
+    if (restoredIndex <= 0) return; // 没有可恢复的进度（全新会话）
+
+    setIndex(restoredIndex);
+    setSessionResults(saved.sessionResults || { known: 0, vague: 0, forgot: 0 });
+    setRelearnCount(saved.relearnCount || {});
+    setResumeFrom(restoredIndex);
+  }
+
+  function restartSession() {
+    setResumeFrom(null);
+    setBreakDismissedAt(null);
+    setIndex(0);
+    setSessionResults({ known: 0, vague: 0, forgot: 0 });
+    setRelearnCount({});
+    try {
+      localStorage.removeItem(SESSION_KEY);
+    } catch {}
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -200,6 +275,7 @@ export default function ReviewPage() {
             setItems(list);
             setPlanCount(list.length);
             setIsDemo(false);
+            tryRestoreSession(list, attackMode ? "stubborn" : "normal");
           } else {
             // 已登录但无待复习词：不降级到 demo，展示空状态
             setItems([]);
@@ -225,6 +301,8 @@ export default function ReviewPage() {
             setPlanCount(cached.length);
             setIsOffline(true);
             setIsDemo(false);
+            // 缓存词表同样支持接续：上次答过的词直接跳过
+            tryRestoreSession(cached, attackMode ? "stubborn" : "normal");
           } else if (!cancelled) {
             // 游客模式：使用预置 demo 词库
             setItems(DEMO_WORDS.map(demoToReviewItem));
@@ -237,10 +315,12 @@ export default function ReviewPage() {
       if (!cancelled) setLoading(false);
     }
 
-    load();
-    // trySync 先 await 再 setState，不会同步触发级联渲染（规则保守误报）
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    trySync();
+    // 先冲刷上次会话遗留的答题队列，再拉今日列表：
+    // 否则队列里尚未同步的结果会让本次列表仍包含已复习过的词（表现为"重复复习"）
+    (async () => {
+      await trySync();
+      if (!cancelled) await load();
+    })();
 
     // 监听网络恢复，自动同步
     const onOnline = () => {
@@ -288,20 +368,14 @@ export default function ReviewPage() {
         return;
       }
 
+      // 写入模型：先持久化入队（关页/断网都不丢），再后台冲刷到服务端。
+      // 旧模型"直接 fetch、失败才入队"在挂起的请求随页面关闭时会静默丢结果，
+      // 导致服务端进度不推进、下次重开重复复习同样的词。
+      // 提交幂等（clientResultId），队列重复同步无副作用。
       const clientResultId = newClientResultId();
-      try {
-        const res = await fetch("/api/review/submit", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ wordId: current.wordId, result, clientResultId }),
-        });
-        if (!res.ok) throw new Error("submit failed");
-        setIsOffline(false);
-      } catch {
-        await enqueueSubmit({ wordId: current.wordId, result, clientResultId });
-        setIsOffline(true);
-        await trySync();
-      }
+      await enqueueSubmit({ wordId: current.wordId, result, clientResultId });
+      setPendingCount((prev) => prev + 1);
+      void trySync();
 
       // 忘了：学习阶梯——本会话内重学（最多 MAX_RELEARN 次），再展示「再看看」
       if (isForgot) {
@@ -547,7 +621,26 @@ export default function ReviewPage() {
         )}
         {isOffline && (
           <div className="alert alert-warning" style={{ textAlign: "center" }}>
-            离线模式 · 数据可能不是最新
+            离线模式 · 正在显示缓存的词表，答题结果已本地保存、联网后自动同步
+          </div>
+        )}
+        {resumeFrom !== null && (
+          <div className="alert alert-info" style={{ textAlign: "center" }}>
+            已接续上次进度，从第 {resumeFrom + 1} / {items.length} 个继续 ·{" "}
+            <button
+              onClick={restartSession}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                textDecoration: "underline",
+                color: "inherit",
+                font: "inherit",
+              }}
+            >
+              从头开始
+            </button>
           </div>
         )}
         {pendingCount > 0 && (

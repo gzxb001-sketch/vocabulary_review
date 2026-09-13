@@ -43,39 +43,43 @@ export async function GET() {
 
   const selected = [...newItems, ...reviewItems];
 
-  return NextResponse.json({
-    count: selected.length,
-    totalDue: due.length,
-    newCount: newItems.length,
-    reviewCount: reviewItems.length,
-    remainingDue: due.length - selected.length,
-    caps: { ...REVIEW_CAPS, ...sprint.caps },
-    sprint: {
-      phase: sprint.phase,
-      daysLeft: sprint.daysLeft,
-      label: sprint.label,
-      hint: sprint.hint,
-    },
-    items: selected.map((item) => ({
-      wordId: item.wordId,
-      displayText: item.word.displayText,
-      meaningZh: item.word.meaningZh,
-      phonetic: item.word.phonetic,
-      exampleSentence: item.word.exampleSentence,
-      sourceType: item.word.sources[0]?.sourceType ?? null,
-      sourceNote: item.word.sources[0]?.sourceNote ?? null,
-      sourceContext: item.word.sources[0]?.sourceContext ?? null,
-      synonyms: parseSynonyms(item.word.note),
-      meanings: item.word.meanings.map((m) => ({
-        partOfSpeech: m.partOfSpeech,
-        meaningZh: m.meaningZh,
-        exampleSentence: m.exampleSentence,
-        exampleTranslation: m.exampleTranslation,
-        isObscure: m.isObscure,
-        isHighFreq: m.isHighFreq,
+  return NextResponse.json(
+    {
+      count: selected.length,
+      totalDue: due.length,
+      newCount: newItems.length,
+      reviewCount: reviewItems.length,
+      remainingDue: due.length - selected.length,
+      caps: { ...REVIEW_CAPS, ...sprint.caps },
+      sprint: {
+        phase: sprint.phase,
+        daysLeft: sprint.daysLeft,
+        label: sprint.label,
+        hint: sprint.hint,
+      },
+      items: selected.map((item) => ({
+        wordId: item.wordId,
+        displayText: item.word.displayText,
+        meaningZh: item.word.meaningZh,
+        phonetic: item.word.phonetic,
+        exampleSentence: item.word.exampleSentence,
+        sourceType: item.word.sources[0]?.sourceType ?? null,
+        sourceNote: item.word.sources[0]?.sourceNote ?? null,
+        sourceContext: item.word.sources[0]?.sourceContext ?? null,
+        synonyms: parseSynonyms(item.word.note),
+        meanings: item.word.meanings.map((m) => ({
+          partOfSpeech: m.partOfSpeech,
+          meaningZh: m.meaningZh,
+          exampleSentence: m.exampleSentence,
+          exampleTranslation: m.exampleTranslation,
+          isObscure: m.isObscure,
+          isHighFreq: m.isHighFreq,
+        })),
       })),
-    })),
-  });
+    },
+    // 每次都必须拿到实时到期列表，禁止任何中间层缓存（否则已复习的词会重复出现）
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }
 
 function parseSynonyms(note?: string | null): string[] {

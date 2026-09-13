@@ -111,8 +111,10 @@ async function removeFromQueue(id: number) {
   }
 }
 
-// 同步队列中的答题结果到服务器
-export async function syncQueue(): Promise<{
+// 同步队列中的答题结果到服务器。
+// 每条提交带超时（AbortController）：挂起的请求按失败处理、保留在队列中，
+// 避免在不稳网络下请求无限挂起或随页面关闭而静默丢失。
+export async function syncQueue(timeoutMs = 8000): Promise<{
   synced: number;
   remaining: number;
 }> {
@@ -123,21 +125,29 @@ export async function syncQueue(): Promise<{
 
   for (const entry of queue) {
     try {
-      const res = await fetch("/api/review/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          wordId: entry.wordId,
-          result: entry.result,
-          clientResultId: entry.clientResultId,
-        }),
-      });
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+      let res: Response;
+      try {
+        res = await fetch("/api/review/submit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            wordId: entry.wordId,
+            result: entry.result,
+            clientResultId: entry.clientResultId,
+          }),
+          signal: ctrl.signal,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
       if (res.ok) {
         await removeFromQueue(entry.id);
         synced++;
       }
     } catch {
-      // 网络不可用，停止同步
+      // 网络不可用/超时，停止同步（队列保留，下次继续）
       break;
     }
   }
@@ -150,4 +160,27 @@ export async function syncQueue(): Promise<{
 export async function getQueueSize(): Promise<number> {
   const queue = await getQueue();
   return queue.length;
+}
+
+/**
+ * 会话接续对齐：按「已答词集合」在新词表中找到第一个未答词的位置。
+ * - 词表与存档完全一致（队列未同步、列表未收缩）→ 按位置精确恢复，
+ *   保留「忘了的词本会话内重学」的待重学副本
+ * - 列表已收缩（已答前缀被服务端移除）→ 跳过已答词继续
+ * 全部已答时返回 listWordIds.length（本轮完成）。
+ */
+export function resumeIndex(
+  listWordIds: string[],
+  savedItems: string[],
+  savedIndex: number,
+): number {
+  if (
+    savedItems.length === listWordIds.length &&
+    savedItems.every((id, i) => id === listWordIds[i])
+  ) {
+    return Math.min(savedIndex, listWordIds.length);
+  }
+  const answered = new Set(savedItems.slice(0, savedIndex));
+  const first = listWordIds.findIndex((id) => !answered.has(id));
+  return first === -1 ? listWordIds.length : first;
 }

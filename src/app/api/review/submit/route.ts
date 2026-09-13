@@ -29,7 +29,10 @@ export async function POST(req: NextRequest) {
         where: { clientResultId: body.clientResultId },
       });
       if (existing) {
-        return NextResponse.json({ ok: true, duplicate: true });
+        return NextResponse.json(
+          { ok: true, duplicate: true },
+          { headers: { "Cache-Control": "no-store" } },
+        );
       }
     }
 
@@ -74,7 +77,10 @@ export async function POST(req: NextRequest) {
       }),
     ]);
 
-    return NextResponse.json({ ok: true, schedule: next });
+    return NextResponse.json(
+      { ok: true, schedule: next },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   } catch (error) {
     console.error("review submit failed", error);
     return NextResponse.json({ message: "submit failed" }, { status: 500 });
