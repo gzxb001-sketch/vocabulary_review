@@ -5,7 +5,10 @@ import { requireUserId, authError } from "@/lib/api-auth";
 
 function escapeCsvCell(value?: string | number | null) {
   if (value === null || value === undefined) return "";
-  const text = String(value);
+  let text = String(value);
+  // 防 CSV 公式注入：Excel/WPS 会把 = + - @ 开头的单元格当公式执行（=HYPERLINK/@import），
+  // 前缀单引号强制按文本处理
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
   return `"${text.replace(/"/g, '""')}"`;
 }
 

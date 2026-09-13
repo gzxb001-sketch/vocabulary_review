@@ -1,34 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { createInitialSchedule } from "@/lib/scheduler";
 import { requireUserId, authError } from "@/lib/api-auth";
 
-type MeaningInput = {
-  partOfSpeech: string;
-  meaningZh: string;
-  exampleSentence?: string;
-  exampleTranslation?: string;
-  isObscure?: boolean;
-  isHighFreq?: boolean;
-};
+// 字段长度与条目数上限：本接口同时承接 OCR 批量、手动录入与 CSV 分块导入
+// （客户端按 100 条分块），不设防的大请求会以 N+1 事务拖满 serverless 超时。
+const requestSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        displayText: z.string().min(1).max(100),
+        lemma: z.string().max(100).optional(),
+        meaningZh: z.string().max(500).optional(),
+        phonetic: z.string().max(100).optional(),
+        partOfSpeech: z.string().max(50).optional(),
+        exampleSentence: z.string().max(1000).optional(),
+        note: z.string().max(500).optional(),
+        synonyms: z.array(z.string().min(1).max(50)).max(8).optional(),
+        meanings: z
+          .array(
+            z.object({
+              partOfSpeech: z.string().max(50),
+              meaningZh: z.string().min(1).max(500),
+              exampleSentence: z.string().max(1000).optional(),
+              exampleTranslation: z.string().max(1000).optional(),
+              isObscure: z.boolean().optional(),
+              isHighFreq: z.boolean().optional(),
+            }),
+          )
+          .max(10)
+          .optional(),
+        source: z.object({
+          sourceType: z.enum(["exam", "reading", "lecture", "manual", "longSentence", "translation", "other"]),
+          sourceNote: z.string().max(200).optional(),
+          sourceContext: z.string().max(500).optional(),
+          imageId: z.string().max(100).optional(),
+        }),
+      }),
+    )
+    .min(1)
+    .max(100),
+});
 
-type SaveWordInput = {
-  displayText: string;
-  lemma: string;
-  meaningZh?: string;
-  phonetic?: string;
-  partOfSpeech?: string;
-  exampleSentence?: string;
-  note?: string;
-  synonyms?: string[];
-  meanings?: MeaningInput[];
-  source: {
-    sourceType: "exam" | "reading" | "lecture" | "manual" | "longSentence" | "translation" | "other";
-    sourceNote?: string;
-    sourceContext?: string;
-    imageId?: string;
-  };
-};
+type SaveWordInput = z.infer<typeof requestSchema>["items"][number];
 
 function encodeSynonyms(synonyms?: string[]): string | null {
   if (!synonyms?.length) return null;
@@ -40,12 +55,11 @@ export async function POST(req: NextRequest) {
   try { userId = await requireUserId(); } catch { return authError(); }
 
   try {
-    const body = await req.json();
-    const items: SaveWordInput[] = body.items || [];
-
-    if (!Array.isArray(items) || items.length === 0) {
-      return NextResponse.json({ message: "items is required" }, { status: 400 });
+    const parsed = requestSchema.safeParse(await req.json());
+    if (!parsed.success) {
+      return NextResponse.json({ message: "invalid request body" }, { status: 400 });
     }
+    const items: SaveWordInput[] = parsed.data.items;
 
     let saved = 0;
     let duplicates = 0;
