@@ -70,6 +70,14 @@ describe("ecdictMeanings — ECDICT 释义解析", () => {
     ]);
   });
 
+  it("ECDICT 源数据中的字面 \\n（反斜杠+n）被还原并正确拆分", () => {
+    const senses = ecdictMeanings("探究, 查考\\nn. 坑, 穴");
+    expect(senses).toEqual([
+      { partOfSpeech: "", meaningZh: "探究, 查考" },
+      { partOfSpeech: "n.", meaningZh: "坑, 穴" },
+    ]);
+  });
+
   it("空串与空行被过滤", () => {
     expect(ecdictMeanings("n. 放弃\n\n\nv. 抛弃")).toHaveLength(2);
     expect(ecdictMeanings("")).toEqual([]);

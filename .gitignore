@@ -17,5 +17,8 @@ prisma/dev.db-journal
 # 本地工具产物
 .workbuddy/
 
+# ECDICT 原始数据（约 180MB，仅构建用；产物 src/lib/ecdict-data.json 才入库）
+data/
+
 .vercel
 .env*.local

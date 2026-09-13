@@ -338,7 +338,7 @@ async function queryFD(text: string): Promise<EnrichedWord | null> {
 
     // 中文义：优先 ECDICT（人工释义）；未收录时把首条英文释义汉化
     const ecdictHit = lookupEcdict(l);
-    let meaningZh = ecdictHit?.translation.split(/\n+/)[0]?.trim() || "";
+    let meaningZh = (ecdictHit ? ecdictMeanings(ecdictHit.translation)[0]?.meaningZh : "") || "";
     if (!meaningZh && meanings[0]) {
       meaningZh = await translate(meanings[0].meaningZh);
     }

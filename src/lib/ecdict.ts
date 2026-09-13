@@ -14,7 +14,8 @@ export type EcdictEntry = {
 };
 
 // 紧凑元组: [音标, 词性, 中文释义, 英文释义]
-const INDEX = raw as Record<string, [string, string, string, string]>;
+// 经 unknown 中转：真实数据的 JSON 类型推断是 string[]，与定长元组不直接兼容
+const INDEX = raw as unknown as Record<string, [string, string, string, string]>;
 
 export function hasEcdictData(): boolean {
   return Object.keys(INDEX).length > 0;
@@ -26,9 +27,11 @@ export function lookupEcdict(word: string): EcdictEntry | null {
   return { phonetic: hit[0] || "", pos: hit[1] || "", translation: hit[2] || "", gloss: hit[3] || "" };
 }
 
-/** 把 ECDICT 的中文释义（\n 分隔，常见 "n. 释义" 格式）拆成义项列表 */
+/** 把 ECDICT 的中文释义（换行分隔，常见 "n. 释义" 格式）拆成义项列表。
+ *  注意：ECDICT 源数据（CSV/SQLite）里的换行是字面的 "\n" 两个字符而非真实换行，需先还原。 */
 export function ecdictMeanings(translation: string): Array<{ partOfSpeech: string; meaningZh: string }> {
   return translation
+    .replace(/\\n/g, "\n")
     .split(/\n+/)
     .map((line) => line.trim())
     .filter(Boolean)

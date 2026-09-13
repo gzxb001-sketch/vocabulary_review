@@ -161,14 +161,22 @@ export default function CaptureReviewPage() {
       const ok = await saveItems(payload);
       if (!ok) return;
 
+      // 未找到释义的词如实告知，避免用户之后在复习里看到空白释义不明所以
+      const missed = payload.filter((p) => !p.meaningZh).length;
+      const savedCount = payload.length;
+
       trackEvent(ANALYTICS_EVENTS.wordSaveSuccess, {
         page: "capture_review",
-        count: payload.length,
+        count: savedCount,
         convertedFromGuest: false,
       });
       clear();
       router.refresh();
-      setHint("已保存！可继续录入。");
+      setHint(
+        missed > 0
+          ? `已保存 ${savedCount} 个词，其中 ${missed} 个未找到自动释义，可在词库中手动补充。`
+          : "已保存！可继续录入。",
+      );
     } catch {
       setError("网络错误，请稍后重试");
     } finally {

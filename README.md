@@ -205,20 +205,24 @@ npm run prisma:generate  # 生成 Prisma Client
 npm run prisma:push      # 同步数据库模型
 ```
 
-## 释义质量：ECDICT 离线词典（建议开启）
+## 释义质量：ECDICT 离线词典（已开启）
 
 应用默认使用「本地考研精解词库 → Free Dictionary → 通用词库」的释义降级链。
 集成 ECDICT 开源离线词典（MIT，340 万词条）后，降级链升级为
-「考研精解 → **ECDICT**（人工编写中文释义，覆盖高频 6 万词）→ Free Dictionary → 通用词库」，
-大幅减少机器翻译带来的释义不准确。
+「考研精解 → **ECDICT**（人工编写中文释义，本地已收词 4.7 万）→ Free Dictionary → 通用词库」，
+大幅减少机器翻译带来的释义不准确。**离线层完全不依赖外部网络**——
+dictionaryapi.dev / Google 翻译在国内网络不可达时，补全依然正常工作。
 
-开启步骤（约 5 分钟）：
+当前 `src/lib/ecdict-data.json`（约 7.4MB）已随仓库提交，开箱即用。
+如需重建：
 
 1. 下载 ECDICT 数据（任选其一）：
-   - [GitHub Releases](https://github.com/skywind3000/ECDICT/releases) 的 `ecdict-csv.zip`（全量）
-   - 或仓库内精简版 `ecdict.min.csv`
-2. 解压后运行：`node scripts/build-ecdict.mjs <csv路径>`
-   （考研词全保留，高频词按词频补充，上限 6 万条，产物约 3~6MB）
-3. 重新构建部署即可。删除 `src/lib/ecdict-data.json` 中的数据可随时停用。
+   - [GitHub Releases](https://github.com/skywind3000/ECDICT/releases) 的 `ecdict-csv.zip`（全量 CSV）
+   - **国内网络 Plan B**：[hf-mirror.com](https://hf-mirror.com) 搜索数据集
+     `iamzhangship/fluency-ecdict-offline`，下载 ECDICT SQLite 打包（约 52MB）
+2. 运行对应构建脚本（考研词全保留，高频词按词频补充，上限 6 万条）：
+   - CSV：`node scripts/build-ecdict.mjs <csv路径>`
+   - SQLite：`node scripts/build-ecdict-from-sqlite.mjs <sqlite路径>`（Node 24+，无需装依赖）
+3. 重新构建部署即可。清空 `src/lib/ecdict-data.json` 数据可随时停用。
 
-未生成数据时 ECDICT 层自动禁用，应用照常工作。
+原始数据文件放在 `data/`（已 gitignore，约 180MB），不需要时可整目录删除。
