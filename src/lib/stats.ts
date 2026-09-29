@@ -1,22 +1,8 @@
 import { prisma } from "@/lib/db";
 
-/**
- * 用户日的起点（北京时间 0 点）：产品面向国内用户，而部署环境（Vercel）是 UTC，
- * 用服务器本地 setHours(0,0,0,0) 会把北京 0-8 点的复习行为记到前一天。
- */
-export function userDayStart(now: Date = new Date()): Date {
-  const shifted = new Date(now.getTime() + 8 * 60 * 60 * 1000);
-  return new Date(
-    Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth(), shifted.getUTCDate()) -
-      8 * 60 * 60 * 1000,
-  );
-}
-
-/** 日期 → 北京时区 "YYYY-M-D" 键（月/日不带前导零，与历史实现一致） */
-export function toDayKey(d: Date): string {
-  const shifted = new Date(d.getTime() + 8 * 60 * 60 * 1000);
-  return `${shifted.getUTCFullYear()}-${shifted.getUTCMonth()}-${shifted.getUTCDate()}`;
-}
+// 北京时区日边界的实现在 user-day.ts（纯函数，客户端也可用）；本地复用 + 透传保持既有导入路径
+import { userDayStart, toDayKey } from "./user-day";
+export { userDayStart, toDayKey };
 
 /** 每日配额形状（sprint 与常规配置共有） */
 export type DayCaps = { newPerDay: number; reviewPerDay: number };

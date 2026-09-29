@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { sendEmail } from "@/lib/mailer";
+import { userDayStart } from "./user-day";
 
 // 提醒调度采用「窗口匹配 + 当日去重」：
 // - 用户设定的时刻是「最早发送时刻」而非精确时刻——只要当前时间已越过设定时刻
@@ -13,12 +14,8 @@ export function shanghaiParts(now: Date): { hour: number; minute: number } {
   return { hour: t.getUTCHours(), minute: t.getUTCMinutes() };
 }
 
-/** 上海时区「今天 00:00」对应的 UTC 时刻 */
-export function startOfShanghaiDay(now: Date): Date {
-  const t = new Date(now.getTime() + 8 * 60 * 60 * 1000);
-  t.setUTCHours(0, 0, 0, 0);
-  return new Date(t.getTime() - 8 * 60 * 60 * 1000);
-}
+/** 上海时区「今天 00:00」对应的 UTC 时刻——统一实现见 user-day.ts，别名导出保持测试兼容 */
+export { userDayStart as startOfShanghaiDay };
 
 export type ReminderUser = {
   id: string;
@@ -39,7 +36,7 @@ export function isUserDueForReminder(user: ReminderUser, now: Date): boolean {
   if (nowMinuteOfDay < scheduledMinuteOfDay) return false;
 
   if (!user.emailLastSentAt) return true;
-  return user.emailLastSentAt.getTime() < startOfShanghaiDay(now).getTime();
+  return user.emailLastSentAt.getTime() < userDayStart(now).getTime();
 }
 
 // 生成应用基础 URL：优先 NEXT_PUBLIC_APP_URL，其次 Vercel 自动注入的生产域名
@@ -92,7 +89,7 @@ async function sendUserReminder(user: { id: string; email: string }, now: Date) 
 
 // 定时任务入口：向所有「已到提醒窗口且今日未发送」的用户发送提醒
 export async function sendDueReminders(now = new Date()) {
-  const startOfToday = startOfShanghaiDay(now);
+  const startOfToday = userDayStart(now);
 
   // 先在库层面用「今日未发送」缩小范围；时间窗口在内存中过滤（个人规模用户量小）
   const users = await prisma.user.findMany({

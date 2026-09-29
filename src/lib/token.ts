@@ -1,7 +1,8 @@
 import { SignJWT, jwtVerify } from "jose";
 
 export const COOKIE_NAME = "vocab-token";
-export const EXPIRES_IN = "7d";
+// 会话有效期：配合 /api/auth/me 的滑动续期，活跃用户每次校验都会重签
+const EXPIRES_IN = "7d";
 
 export function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;

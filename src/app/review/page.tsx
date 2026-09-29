@@ -11,6 +11,7 @@ import {
   syncQueue,
   resumeIndex,
 } from "@/lib/review-offline";
+import { beijingDateStr } from "@/lib/user-day";
 import { DEMO_WORDS, type DemoReviewItem } from "@/lib/demo-words";
 import { REVIEW_CAPS } from "@/lib/review-config";
 import {
@@ -181,7 +182,7 @@ export default function ReviewPage() {
       localStorage.setItem(
         LAST_SESSION_KEY,
         JSON.stringify({
-          date: new Date().toISOString().slice(0, 10),
+          date: beijingDateStr(),
           known: sessionResults.known,
           vague: sessionResults.vague,
           forgot: sessionResults.forgot,
@@ -239,7 +240,7 @@ export default function ReviewPage() {
       const raw = localStorage.getItem(SESSION_KEY);
       if (raw) saved = JSON.parse(raw) as SavedSession;
     } catch {}
-    if (!saved || saved.date !== new Date().toISOString().slice(0, 10)) return;
+    if (!saved || saved.date !== beijingDateStr()) return;
     if (saved.mode !== sessionMode || !saved.items?.length) return;
 
     const restoredIndex = resumeIndex(

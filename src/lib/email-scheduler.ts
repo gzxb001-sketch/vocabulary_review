@@ -22,7 +22,9 @@ export function startEmailScheduler() {
     try {
       const result = await sendDueReminders();
       if (result.matched > 0) {
-        console.log("[email-scheduler] 命中", result.matched, "位用户:", JSON.stringify(result.results));
+        // 日志最小化：只打印人数，不输出含 userId 的明细列表
+        const sent = result.results.filter((r) => r.sent).length;
+        console.log("[email-scheduler] 本轮提醒：匹配", result.matched, "人，成功", sent, "人");
       }
     } catch (e) {
       console.error("[email-scheduler] 发送失败:", e);

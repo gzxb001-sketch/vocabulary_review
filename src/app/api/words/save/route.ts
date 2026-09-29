@@ -205,10 +205,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ saved, duplicates });
   } catch (error: any) {
-    const msg = error?.message || String(error);
-    console.error("save words failed:", msg);
+    // 详情只进服务端日志：原始错误可能携带 Prisma/数据库内部信息，不透传客户端
+    console.error("save words failed:", error?.message || String(error));
     return NextResponse.json(
-      { message: "保存失败", detail: msg },
+      { message: "保存失败" },
       { status: 500 }
     );
   }

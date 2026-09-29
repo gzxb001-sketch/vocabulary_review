@@ -156,12 +156,6 @@ export async function syncQueue(timeoutMs = 8000): Promise<{
   return { synced, remaining };
 }
 
-// 获取队列长度（用于显示待同步数量）
-export async function getQueueSize(): Promise<number> {
-  const queue = await getQueue();
-  return queue.length;
-}
-
 /**
  * 会话接续对齐：按「已答词集合」在新词表中找到第一个未答词的位置。
  * - 词表与存档完全一致（队列未同步、列表未收缩）→ 按位置精确恢复，
