@@ -2968,6 +2968,23 @@ body.review-immersive .bottom-nav {
   color: var(--color-success);
 }
 
+/* 拼写抽查开关入口（拼写页/休息屏/总结屏共用的小文字按钮） */
+.review-spell-off {
+  background: none;
+  border: none;
+  padding: var(--space-2);
+  cursor: pointer;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color var(--transition-fast);
+}
+
+.review-spell-off:hover {
+  color: var(--color-text-primary);
+}
+
 /* 翻面前的语境回忆线：回到用户遇到这个词的原句（Lingvist 式，英语原句不泄露词义） */
 .review-memory-cue {
   display: flex;

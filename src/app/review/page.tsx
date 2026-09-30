@@ -79,6 +79,8 @@ function newClientResultId(): string {
 }
 
 const SESSION_KEY = "zhumo-review-session";
+// 拼写抽查开关：持久化到 localStorage（"0"=关，缺省=开）
+const SPELLING_ENABLED_KEY = "zhumo-spelling-enabled";
 
 // 会话进度存档：按「日期 + 词表 wordId + 已答位置」持久化，重开页面可接续
 type SavedSession = {
@@ -125,6 +127,8 @@ export default function ReviewPage() {
   // 拼写抽查：只验证「认识」的声明（模糊本就没把握，再考拼写挫败感强），
   // 随机间隔 8~12 个非忘词一次；答后重新随机，避免固定节奏可被预期
   const [nextSpellingAt, setNextSpellingAt] = useState(() => 8 + Math.floor(Math.random() * 5));
+  // 拼写抽查开关（用户可在拼写页/休息屏/总结屏切换，持久化）
+  const [spellingEnabled, setSpellingEnabled] = useState(true);
   // 拼写只作练习反馈，单独统计，不写入 SRS 调度（拼写对错 ≠ 认不认识）
   const [spellingStats, setSpellingStats] = useState({ right: 0, wrong: 0 });
   const LAST_SESSION_KEY = "zhumo_last_session";
@@ -147,6 +151,31 @@ export default function ReviewPage() {
       if (raw) setLastSession(JSON.parse(raw));
     } catch {}
   }, []);
+
+  useEffect(() => {
+    // 读取拼写抽查开关（默认开）
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSpellingEnabled(localStorage.getItem(SPELLING_ENABLED_KEY) !== "0");
+    } catch {}
+  }, []);
+
+  function setSpellingToggle(next: boolean) {
+    setSpellingEnabled(next);
+    try {
+      localStorage.setItem(SPELLING_ENABLED_KEY, next ? "1" : "0");
+    } catch {}
+  }
+
+  // 拼写页上点「永久关闭」：立即收起本次拼写并正常推进，不计入拼写统计
+  function disableSpellingAndSkip() {
+    setSpellingToggle(false);
+    setIsSpelling(false);
+    setSpellingChecked(false);
+    setSpellingInput("");
+    setNextSpellingAt(nonForgotCount + 8 + Math.floor(Math.random() * 5));
+    setIndex((prev) => prev + 1);
+  }
 
   // 埋点：会话开始/结束各上报一次（ref 防止 StrictMode 重挂载与状态变化导致重复上报）
   const trackedStartRef = useRef(false);
@@ -369,8 +398,8 @@ export default function ReviewPage() {
       if (!isForgot) {
         const nextCount = nonForgotCount + 1;
         setNonForgotCount(nextCount);
-        // 拼写抽查只验证「认识」：模糊不必再考拼写；阈值未到则正常推进
-        if (!isDemo && result === "known" && nextCount >= nextSpellingAt) {
+        // 拼写抽查只验证「认识」且用户未关闭：模糊不必再考拼写；阈值未到则正常推进
+        if (!isDemo && spellingEnabled && result === "known" && nextCount >= nextSpellingAt) {
           setIsSpelling(true);
           setSpellingChecked(false);
           setSpellingInput("");
@@ -414,7 +443,7 @@ export default function ReviewPage() {
         setPausing(true);
       }
     },
-    [items, index, trySync, isDemo, nonForgotCount, relearnCount, nextSpellingAt]
+    [items, index, trySync, isDemo, nonForgotCount, relearnCount, nextSpellingAt, spellingEnabled]
   );
 
   // 拼写验证：用户输入单词后提交。只作练习反馈，不计入 SRS 调度。
@@ -676,6 +705,9 @@ export default function ReviewPage() {
                 <Link href="/manual" className="link-button secondary">继续录词</Link>
               )}
             </div>
+            <button className="review-spell-off" onClick={() => setSpellingToggle(!spellingEnabled)}>
+              拼写抽查：{spellingEnabled ? "已开启 · 点击关闭" : "已关闭 · 点击开启"}
+            </button>
           </div>
         )}
       </main>
@@ -700,6 +732,9 @@ export default function ReviewPage() {
               提前结束
             </button>
           </div>
+          <button className="review-spell-off" onClick={() => setSpellingToggle(!spellingEnabled)}>
+            拼写抽查：{spellingEnabled ? "已开启 · 点击关闭" : "已关闭 · 点击开启"}
+          </button>
         </div>
       </main>
     );
@@ -816,6 +851,9 @@ export default function ReviewPage() {
                 <p className="review-stage-hint">看释义，拼出单词</p>
                 <p className="review-hero-word is-clue">{current.meaningZh || "（该词暂无释义）"}</p>
                 {current.phonetic && <p className="review-hero-phonetic">{current.phonetic}</p>}
+                <button className="review-spell-off" onClick={disableSpellingAndSkip}>
+                  不想被抽查？永久关闭拼写
+                </button>
               </>
             ) : (
               <>
