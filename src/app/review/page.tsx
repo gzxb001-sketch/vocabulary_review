@@ -630,10 +630,11 @@ export default function ReviewPage() {
   const obscureMeanings = (current.meanings || []).filter((m) => m.isObscure);
   const meaningEx = (current.meanings || []).find((m) => m.exampleSentence);
   const example = current.exampleSentence || meaningEx?.exampleSentence;
-  // 义项渐进披露：主释义 + 前 2 条平铺，其余（含熟词僻义/近义词/来源）折叠
+  // 义项层级：主释义 + 前 2 条平铺、熟词僻义带标直出（考研考点不折叠），
+  // 仅第 3 条之后的冷门常见义与近义词/来源信息折叠
   const shownMeanings = commonMeanings.slice(0, 2);
   const extraCommon = commonMeanings.slice(2);
-  const hiddenCount = extraCommon.length + obscureMeanings.length;
+  const hiddenCount = extraCommon.length;
   const hasExtras =
     hiddenCount > 0 ||
     (current.synonyms?.length ?? 0) > 0 ||
@@ -702,105 +703,113 @@ export default function ReviewPage() {
         <p className="review-status">专项攻克模式 · 只刷反复记不住的词</p>
       ) : null}
 
-      {/* 中部内容区：唯一可能滚动的区域 */}
+      {/* 中部内容区：唯一可能滚动的区域；词卡是页面主体 */}
       <div className="review-body">
         <div className="review-stage">
-          {isSpelling ? (
-            <div className="review-stage-inner">
-              <p className="review-spell-hint">看释义，拼出单词</p>
-              <div className="flashcard-reveal">
-                <p className="flashcard-meaning">{current.meaningZh || "（该词暂无释义）"}</p>
-                {current.phonetic && <p className="word-phonetic">{current.phonetic}</p>}
-              </div>
-            </div>
-          ) : (
-            <>
-              <h1 className="flashcard-word">
-                {current.displayText}
-                <span className="review-word-tools">
-                  <SpeakButton text={current.displayText} />
-                  <Link
-                    href={`/words/${current.wordId}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="review-word-link"
-                    title="查看详情"
-                  >
-                    <IconExternalLink />
-                  </Link>
-                </span>
-              </h1>
+          <div className={`review-stage-card${revealed && !isSpelling ? " is-revealed" : ""}`}>
+            {!isSpelling && (
+              <Link
+                href={`/words/${current.wordId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="review-card-link"
+                title="查看详情"
+                aria-label="查看词详情"
+              >
+                <IconExternalLink />
+              </Link>
+            )}
 
-              {revealed && (
-                <div className="flashcard-reveal">
-                  {current.meaningZh && <p className="flashcard-meaning">{current.meaningZh}</p>}
-                  {current.phonetic && <p className="word-phonetic">{current.phonetic}</p>}
-                  {current.sourceContext && (
-                    <p className="review-context">&ldquo;{current.sourceContext}&rdquo;</p>
-                  )}
+            {isSpelling ? (
+              <>
+                <p className="review-stage-hint">看释义，拼出单词</p>
+                <p className="review-hero-word is-clue">{current.meaningZh || "（该词暂无释义）"}</p>
+                {current.phonetic && <p className="review-hero-phonetic">{current.phonetic}</p>}
+              </>
+            ) : (
+              <>
+                <h1 className="review-hero-word">{current.displayText}</h1>
+                {revealed && current.phonetic && (
+                  <p className="review-hero-phonetic">{current.phonetic}</p>
+                )}
+                <SpeakButton text={current.displayText} />
+                {!revealed && <p className="review-stage-hint">回忆它的意思，再翻面核对</p>}
+              </>
+            )}
+          </div>
 
-                  {example && (
-                    <div className="review-example">
-                      <p className="review-example-en">{example}</p>
-                      {meaningEx?.exampleTranslation && (
-                        <p className="review-example-zh">{meaningEx.exampleTranslation}</p>
-                      )}
+          {revealed && !isSpelling && (
+            <div className="review-answer">
+              {/* 释义为注脚层：明显小于单词；熟词僻义带「僻」标直接亮出，考研考点不折叠 */}
+              {shownMeanings.length > 0 || obscureMeanings.length > 0 ? (
+                <div className="review-meanings-plain">
+                  {shownMeanings.map((m, i) => (
+                    <div key={i} className="review-meaning-row">
+                      <span className="meta-chip">{m.partOfSpeech}</span>
+                      <span className="review-meaning-text">{m.meaningZh}</span>
                     </div>
-                  )}
-
-                  {/* 义项渐进披露：主释义 + 前 2 条平铺，其余折叠 */}
-                  {shownMeanings.length > 0 && (
-                    <div className="review-meanings">
-                      {shownMeanings.map((m, i) => (
-                        <div key={i} className="meaning-item-sm">
-                          <span className="meta-chip">{m.partOfSpeech}</span>
-                          <span className="meaning-zh-sm">{m.meaningZh}</span>
-                        </div>
-                      ))}
+                  ))}
+                  {obscureMeanings.map((m, i) => (
+                    <div key={`o${i}`} className="review-meaning-row">
+                      <span className="review-obscure-tag">僻</span>
+                      <span className="meta-chip">{m.partOfSpeech}</span>
+                      <span className="review-meaning-text">{m.meaningZh}</span>
                     </div>
-                  )}
+                  ))}
+                </div>
+              ) : (
+                current.meaningZh && (
+                  <div className="review-meanings-plain">
+                    <div className="review-meaning-row">
+                      <span className="review-meaning-text">{current.meaningZh}</span>
+                    </div>
+                  </div>
+                )
+              )}
 
-                  {hasExtras && (
-                    <details className="review-more">
-                      <summary>
-                        {hiddenCount > 0 ? `+${hiddenCount} 条义项` : "更多信息"}
-                        {obscureMeanings.length > 0 ? " · 含熟词僻义" : ""}
-                      </summary>
-                      <div className="review-more-body">
-                        {extraCommon.map((m, i) => (
-                          <div key={`c${i}`} className="meaning-item-sm">
-                            <span className="meta-chip">{m.partOfSpeech}</span>
-                            <span className="meaning-zh-sm">{m.meaningZh}</span>
-                          </div>
-                        ))}
-                        {obscureMeanings.map((m, i) => (
-                          <div key={`o${i}`} className="meaning-item-sm meaning-obscure">
-                            <span className="meta-chip">{m.partOfSpeech}</span>
-                            <span className="meaning-zh-sm">{m.meaningZh}</span>
-                          </div>
-                        ))}
-                        {(current.synonyms?.length ?? 0) > 0 && (
-                          <div className="review-synonyms">
-                            <span className="muted">近义词：</span>
-                            {current.synonyms!.map((s) => (
-                              <span key={s} className="synonym-chip">{s}</span>
-                            ))}
-                          </div>
-                        )}
-                        {(current.sourceType || current.sourceNote) && (
-                          <div className="review-meta">
-                            {current.sourceType && (
-                              <span className="meta-chip">来源：{SOURCE_LABELS[current.sourceType] || current.sourceType}</span>
-                            )}
-                            {current.sourceNote && <span className="muted">{current.sourceNote}</span>}
-                          </div>
-                        )}
-                      </div>
-                    </details>
+              {current.sourceContext && (
+                <p className="review-context">&ldquo;{current.sourceContext}&rdquo;</p>
+              )}
+
+              {example && (
+                <div className="review-example">
+                  <p className="review-example-en">{example}</p>
+                  {meaningEx?.exampleTranslation && (
+                    <p className="review-example-zh">{meaningEx.exampleTranslation}</p>
                   )}
                 </div>
               )}
-            </>
+
+              {hasExtras && (
+                <details className="review-more">
+                  <summary>{hiddenCount > 0 ? `+${hiddenCount} 条义项` : "更多信息"}</summary>
+                  <div className="review-more-body">
+                    {extraCommon.map((m, i) => (
+                      <div key={`c${i}`} className="meaning-item-sm">
+                        <span className="meta-chip">{m.partOfSpeech}</span>
+                        <span className="meaning-zh-sm">{m.meaningZh}</span>
+                      </div>
+                    ))}
+                    {(current.synonyms?.length ?? 0) > 0 && (
+                      <div className="review-synonyms">
+                        <span className="muted">近义词：</span>
+                        {current.synonyms!.map((s) => (
+                          <span key={s} className="synonym-chip">{s}</span>
+                        ))}
+                      </div>
+                    )}
+                    {(current.sourceType || current.sourceNote) && (
+                      <div className="review-meta">
+                        {current.sourceType && (
+                          <span className="meta-chip">来源：{SOURCE_LABELS[current.sourceType] || current.sourceType}</span>
+                        )}
+                        {current.sourceNote && <span className="muted">{current.sourceNote}</span>}
+                      </div>
+                    )}
+                  </div>
+                </details>
+              )}
+            </div>
           )}
         </div>
       </div>
