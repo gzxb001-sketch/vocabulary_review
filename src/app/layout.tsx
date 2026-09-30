@@ -43,7 +43,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" suppressHydrationWarning>
+      {/* suppressHydrationWarning：主题脚本在水合前给 html 加 dark class，属预期差异 */}
       <body>
         {/* 主题初始化：跟随系统暗色偏好，在首帧前挂载 html.dark 避免闪烁 */}
         <script

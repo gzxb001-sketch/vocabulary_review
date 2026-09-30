@@ -20,7 +20,6 @@ import {
   IconX,
   IconCheckCircle,
   IconXCircle,
-  IconAlertTriangle,
   IconSparkles,
   IconPause,
   IconExternalLink,
@@ -463,6 +462,18 @@ export default function ReviewPage() {
     !isDemo && index > 0 && index < items.length && index % REVIEW_CAPS.sessionSize === 0;
   const showSessionBreak = atSessionBoundary && breakDismissedAt !== index;
 
+  // 沉浸模式：会话进行中隐藏全局底部导航，✕ 结束后自动恢复
+  const sessionActive = !loading && items.length > 0 && index < items.length && !showSessionBreak;
+  useEffect(() => {
+    document.body.classList.toggle("review-immersive", sessionActive);
+    return () => document.body.classList.remove("review-immersive");
+  }, [sessionActive]);
+
+  // 切词后回到顶部：上一张卡片的滚动位置不应残留到下一张
+  useEffect(() => {
+    if (sessionActive) window.scrollTo(0, 0);
+  }, [index, sessionActive]);
+
   // 提前结束本轮
   function endSession() {
     setWasEndedEarly(true);
@@ -617,245 +628,232 @@ export default function ReviewPage() {
   const current = items[index];
   const commonMeanings = (current.meanings || []).filter((m) => !m.isObscure);
   const obscureMeanings = (current.meanings || []).filter((m) => m.isObscure);
+  const meaningEx = (current.meanings || []).find((m) => m.exampleSentence);
+  const example = current.exampleSentence || meaningEx?.exampleSentence;
+  // 义项渐进披露：主释义 + 前 2 条平铺，其余（含熟词僻义/近义词/来源）折叠
+  const shownMeanings = commonMeanings.slice(0, 2);
+  const extraCommon = commonMeanings.slice(2);
+  const hiddenCount = extraCommon.length + obscureMeanings.length;
+  const hasExtras =
+    hiddenCount > 0 ||
+    (current.synonyms?.length ?? 0) > 0 ||
+    Boolean(current.sourceType || current.sourceNote);
 
   return (
-    <main className="container fade-in">
-      <div className="card stack">
-        <div className="progress-badge">{index + 1} / {items.length}</div>
-        {planCount > 0 && (
-          <p className="muted" style={{ textAlign: "center", fontSize: "var(--text-xs)", marginBottom: "var(--space-2)" }}>
-            {mode === "stubborn"
-              ? `本次攻克 ${planCount} 个顽固词 · 每 ${REVIEW_CAPS.sessionSize} 个休息一次`
-              : `本轮 ${planCount} 个词 · 每 ${REVIEW_CAPS.sessionSize} 个休息一次`}
-            {todayMeta && mode !== "stubborn"
-              ? ` · 今日已完成 ${Math.min(
-                  todayMeta.reviewedToday + todayAnswered.size,
-                  todayMeta.todayPlan,
-                )} / ${todayMeta.todayPlan}`
-              : ""}
-          </p>
-        )}
+    <main className="review-shell fade-in">
+      {/* 顶栏：结束入口 + 进度条 + 计数 */}
+      <header className="review-top">
+        <button
+          className="review-exit"
+          aria-label="提前结束本轮"
+          title="提前结束"
+          onClick={() => {
+            if (index === 0 || window.confirm(`确定提前结束本轮？已完成 ${index}/${items.length} 个。`)) {
+              endSession();
+            }
+          }}
+        >
+          <IconX />
+        </button>
+        <div
+          className="review-progress"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={items.length}
+          aria-valuenow={index}
+        >
+          <div
+            className="review-progress-fill"
+            style={{ width: `${Math.min(100, (index / items.length) * 100)}%` }}
+          />
+        </div>
+        <span className="review-counter">{index + 1} / {items.length}</span>
+      </header>
 
-        {mode === "stubborn" && (
-          <div className="alert alert-info" style={{ textAlign: "center" }}>
-            专项攻克模式 · 只刷反复记不住的词，答题照常推进记忆曲线
-          </div>
-        )}
+      {/* 状态条：按优先级只显示一条，替代原先堆叠的横幅 */}
+      {isOffline ? (
+        <p className="review-status is-warn">● 离线模式 · 答题已本地保存，联网后自动同步</p>
+      ) : resumeFrom !== null ? (
+        <p className="review-status">
+          已接续上次进度，从第 {resumeFrom + 1} 个继续 ·
+          <button className="review-status-action" onClick={restartSession}>从头开始</button>
+        </p>
+      ) : pendingCount > 0 ? (
+        <p className="review-status">{pendingCount} 条答题结果将在联网后自动同步</p>
+      ) : isDemo ? (
+        <p className="review-status">体验模式 · 注册后解锁完整功能</p>
+      ) : mode === "stubborn" ? (
+        <p className="review-status">专项攻克模式 · 只刷反复记不住的词</p>
+      ) : todayMeta ? (
+        <p className="review-status">
+          今日已完成 {Math.min(todayMeta.reviewedToday + todayAnswered.size, todayMeta.todayPlan)} / {todayMeta.todayPlan}
+        </p>
+      ) : null}
 
-        {isDemo && (
-          <div className="alert alert-info" style={{ textAlign: "center" }}>
-            体验模式 · 注册后解锁完整功能
-          </div>
-        )}
-        {isOffline && (
-          <div className="alert alert-warning" style={{ textAlign: "center" }}>
-            离线模式 · 正在显示缓存的词表，答题结果已本地保存、联网后自动同步
-          </div>
-        )}
-        {resumeFrom !== null && (
-          <div className="alert alert-info" style={{ textAlign: "center" }}>
-            已接续上次进度，从第 {resumeFrom + 1} / {items.length} 个继续 ·{" "}
-            <button
-              onClick={restartSession}
-              style={{
-                background: "none",
-                border: "none",
-                padding: 0,
-                cursor: "pointer",
-                textDecoration: "underline",
-                color: "inherit",
-                font: "inherit",
-              }}
-            >
-              从头开始
-            </button>
-          </div>
-        )}
-        {pendingCount > 0 && (
-          <div className="alert alert-info" style={{ textAlign: "center" }}>
-            {pendingCount} 条答题结果将在联网后自动同步
-          </div>
-        )}
-
-        <h1 className="flashcard-word" style={{ position: "relative" }}>
-          {current.displayText}
-          <span style={{ marginLeft: "var(--space-2)" }}>
-            <SpeakButton text={current.displayText} />
-          </span>
-          <Link
-            href={`/words/${current.wordId}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              fontSize: "var(--text-sm)",
-              color: "var(--color-text-muted)",
-              marginLeft: "var(--space-2)",
-              textDecoration: "none",
-              opacity: 0.5,
-            }}
-            title="查看详情"
-          >
-            <IconExternalLink />
-          </Link>
-        </h1>
-
-        {isSpelling ? (
-          <div className="stack">
-            <div className="flashcard-reveal" style={{ textAlign: "center" }}>
-              <p className="flashcard-meaning">{current.meaningZh || current.displayText}</p>
-              {current.phonetic && <p className="word-phonetic">{current.phonetic}</p>}
+      {/* 中部内容区：唯一可能滚动的区域 */}
+      <div className="review-body">
+        <div className="review-stage">
+          {isSpelling ? (
+            <div className="review-stage-inner">
+              <p className="review-spell-hint">看释义，拼出单词</p>
+              <div className="flashcard-reveal">
+                <p className="flashcard-meaning">{current.meaningZh || "（该词暂无释义）"}</p>
+                {current.phonetic && <p className="word-phonetic">{current.phonetic}</p>}
+              </div>
             </div>
-            {!spellingChecked ? (
-              <div className="stack" style={{ marginTop: "var(--space-3)" }}>
-                <input
-                  className="input"
-                  type="text"
-                  autoFocus
-                  placeholder="请输入对应单词..."
-                  value={spellingInput}
-                  onChange={(e) => setSpellingInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && spellingInput.trim()) handleSpelling();
-                  }}
-                />
-                <div style={{ display: "flex", gap: "var(--space-2)" }}>
-                  <button className="button" onClick={handleSpelling} disabled={!spellingInput.trim()}>
-                    提交
-                  </button>
-                  <button className="button button-secondary" onClick={skipSpelling}>
-                    想不起来
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="stack" style={{ textAlign: "center", marginTop: "var(--space-3)" }}>
-                {spellingCorrect ? (
-                  <p style={{ color: "var(--color-success)", fontWeight: "var(--font-semibold)" }}>
-                    <IconCheckCircle /> 拼写正确！
-                  </p>
-                ) : (
-                  <div>
-                    <p style={{ color: "var(--color-danger)", fontWeight: "var(--font-semibold)", marginBottom: "var(--space-2)" }}>
-                      <IconXCircle /> 拼写有误
-                    </p>
-                    <p className="word-display" style={{ fontSize: "1.5rem" }}>
-                      正确答案：{current.displayText}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        ) : !revealed ? (
-          <button className="button" onClick={() => setRevealed(true)} style={{ marginTop: "var(--space-4)" }}>
-            点击显示答案
-          </button>
-        ) : (
-          <div className="stack">
-            <div className="flashcard-reveal">
-              {current.meaningZh && <p className="flashcard-meaning">{current.meaningZh}</p>}
-              {current.phonetic && <p className="word-phonetic">{current.phonetic}</p>}
-              {current.sourceContext && (
-                <p className="review-context">&ldquo;{current.sourceContext}&rdquo;</p>
-              )}
+          ) : (
+            <>
+              <h1 className="flashcard-word">
+                {current.displayText}
+                <span className="review-word-tools">
+                  <SpeakButton text={current.displayText} />
+                  <Link
+                    href={`/words/${current.wordId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="review-word-link"
+                    title="查看详情"
+                  >
+                    <IconExternalLink />
+                  </Link>
+                </span>
+              </h1>
 
-              {(() => {
-                const top = current.exampleSentence;
-                const meaningEx = (current.meanings || []).find((m) => m.exampleSentence);
-                const example = top || meaningEx?.exampleSentence;
-                if (!example) return null;
-                return (
-                  <div className="review-example">
-                    <p className="review-example-en">{example}</p>
-                    {meaningEx?.exampleTranslation && (
-                      <p className="review-example-zh">{meaningEx.exampleTranslation}</p>
-                    )}
-                  </div>
-                );
-              })()}
+              {revealed && (
+                <div className="flashcard-reveal">
+                  {current.meaningZh && <p className="flashcard-meaning">{current.meaningZh}</p>}
+                  {current.phonetic && <p className="word-phonetic">{current.phonetic}</p>}
+                  {current.sourceContext && (
+                    <p className="review-context">&ldquo;{current.sourceContext}&rdquo;</p>
+                  )}
 
-              {/* 完整义项列表 */}
-              {(current.meanings || []).length > 0 && (
-                <div className="review-meanings">
-                  {commonMeanings.map((m, i) => (
-                    <div key={i} className="meaning-item-sm">
-                      <span className="meta-chip">{m.partOfSpeech}</span>
-                      <span className="meaning-zh-sm">{m.meaningZh}</span>
+                  {example && (
+                    <div className="review-example">
+                      <p className="review-example-en">{example}</p>
+                      {meaningEx?.exampleTranslation && (
+                        <p className="review-example-zh">{meaningEx.exampleTranslation}</p>
+                      )}
                     </div>
-                  ))}
-                  {obscureMeanings.length > 0 && (
-                    <details className="obscure-section" style={{ marginTop: "var(--space-2)" }}>
-                      <summary className="obscure-toggle">
-                        <IconAlertTriangle /> 熟词僻义 — {obscureMeanings.length} 条
+                  )}
+
+                  {/* 义项渐进披露：主释义 + 前 2 条平铺，其余折叠 */}
+                  {shownMeanings.length > 0 && (
+                    <div className="review-meanings">
+                      {shownMeanings.map((m, i) => (
+                        <div key={i} className="meaning-item-sm">
+                          <span className="meta-chip">{m.partOfSpeech}</span>
+                          <span className="meaning-zh-sm">{m.meaningZh}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {hasExtras && (
+                    <details className="review-more">
+                      <summary>
+                        {hiddenCount > 0 ? `+${hiddenCount} 条义项` : "更多信息"}
+                        {obscureMeanings.length > 0 ? " · 含熟词僻义" : ""}
                       </summary>
-                      <div style={{ marginTop: "var(--space-2)", display: "grid", gap: "var(--space-1)" }}>
-                        {obscureMeanings.map((m, i) => (
-                          <div key={i} className="meaning-item-sm meaning-obscure">
+                      <div className="review-more-body">
+                        {extraCommon.map((m, i) => (
+                          <div key={`c${i}`} className="meaning-item-sm">
                             <span className="meta-chip">{m.partOfSpeech}</span>
                             <span className="meaning-zh-sm">{m.meaningZh}</span>
                           </div>
                         ))}
+                        {obscureMeanings.map((m, i) => (
+                          <div key={`o${i}`} className="meaning-item-sm meaning-obscure">
+                            <span className="meta-chip">{m.partOfSpeech}</span>
+                            <span className="meaning-zh-sm">{m.meaningZh}</span>
+                          </div>
+                        ))}
+                        {(current.synonyms?.length ?? 0) > 0 && (
+                          <div className="review-synonyms">
+                            <span className="muted">近义词：</span>
+                            {current.synonyms!.map((s) => (
+                              <span key={s} className="synonym-chip">{s}</span>
+                            ))}
+                          </div>
+                        )}
+                        {(current.sourceType || current.sourceNote) && (
+                          <div className="review-meta">
+                            {current.sourceType && (
+                              <span className="meta-chip">来源：{SOURCE_LABELS[current.sourceType] || current.sourceType}</span>
+                            )}
+                            {current.sourceNote && <span className="muted">{current.sourceNote}</span>}
+                          </div>
+                        )}
                       </div>
                     </details>
                   )}
                 </div>
               )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* 底部动作栏：吸底拇指热区，任何时刻可及 */}
+      <footer className="review-dock">
+        {isSpelling ? (
+          spellingChecked ? (
+            <div className={`review-spell-result ${spellingCorrect ? "is-ok" : "is-bad"}`}>
+              {spellingCorrect ? (
+                <><IconCheckCircle /> 拼写正确！</>
+              ) : (
+                <>正确答案：{current.displayText}</>
+              )}
             </div>
-
-            {(current.sourceType || current.sourceNote) && (
-              <div className="review-meta">
-                {current.sourceType && (
-                  <span className="meta-chip">来源：{SOURCE_LABELS[current.sourceType] || current.sourceType}</span>
-                )}
-                {current.sourceNote && <span className="muted">{current.sourceNote}</span>}
-              </div>
-            )}
-
-            {current.synonyms && current.synonyms.length > 0 && (
-              <div className="review-synonyms">
-                <span className="muted" style={{ fontSize: "var(--text-xs)" }}>近义词：</span>
-                {current.synonyms.map((s) => (
-                  <span key={s} className="synonym-chip">{s}</span>
-                ))}
-              </div>
-            )}
-
-            <div className="divider" />
-
-            {pausing ? (
-              <div className="stack" style={{ textAlign: "center" }}>
-                <p className="muted" style={{ fontSize: "var(--text-md)", marginBottom: "var(--space-2)" }}>
-                  已标记为「不会」，2s 后进入下一词
-                </p>
-                <button className="button button-secondary" onClick={() => { setPausing(false); setIndex((prev) => prev + 1); }}>
-                  再看一眼
-                </button>
-              </div>
-            ) : (
-              <div className="answer-buttons">
-                <button className="answer-btn known" onClick={() => submit("known")}>
-                  <span className="answer-emoji"><IconThumbsUp /></span>认识
-                </button>
-                <button className="answer-btn vague" onClick={() => submit("vague")}>
-                  <span className="answer-emoji"><IconHelp /></span>模糊
-                </button>
-                <button className="answer-btn forgot" onClick={() => submit("forgot")}>
-                  <span className="answer-emoji"><IconX /></span>不会
-                </button>
-              </div>
-            )}
-
-            {/* 提前结束按钮 */}
+          ) : (
+            <div className="review-spell-row">
+              <input
+                className="input"
+                type="text"
+                autoFocus
+                placeholder="输入英文单词…"
+                value={spellingInput}
+                onChange={(e) => setSpellingInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && spellingInput.trim()) handleSpelling();
+                }}
+                aria-label="拼写单词"
+              />
+              <button className="review-dock-btn primary" onClick={handleSpelling} disabled={!spellingInput.trim()}>
+                提交
+              </button>
+              <button className="review-dock-skip" onClick={skipSpelling}>
+                想不起来
+              </button>
+            </div>
+          )
+        ) : pausing ? (
+          <div className="review-dock-stack">
+            <p className="review-dock-caption">已标记为「不会」，2 秒后自动继续</p>
             <button
-              className="button button-secondary"
-              style={{ marginTop: "var(--space-3)", opacity: 0.7 }}
-              onClick={endSession}
+              className="review-dock-btn secondary"
+              onClick={() => { setPausing(false); setIndex((prev) => prev + 1); }}
             >
-              提前结束（已完成 {index + 1}/{items.length}）
+              再看一眼
+            </button>
+          </div>
+        ) : !revealed ? (
+          <button className="review-dock-btn primary" onClick={() => setRevealed(true)}>
+            显示答案
+          </button>
+        ) : (
+          <div className="review-dock-actions">
+            <button className="answer-btn known" onClick={() => submit("known")}>
+              <span className="answer-emoji"><IconThumbsUp /></span>认识
+            </button>
+            <button className="answer-btn vague" onClick={() => submit("vague")}>
+              <span className="answer-emoji"><IconHelp /></span>模糊
+            </button>
+            <button className="answer-btn forgot" onClick={() => submit("forgot")}>
+              <span className="answer-emoji"><IconX /></span>不会
             </button>
           </div>
         )}
-      </div>
+      </footer>
     </main>
   );
 }

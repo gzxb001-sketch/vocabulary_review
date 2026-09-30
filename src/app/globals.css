@@ -2759,3 +2759,352 @@ html.dark body::before {
   border-radius: var(--radius-full);
   padding: 1px 8px;
 }
+
+/* ============================================================
+   复习页 · 三段式一屏卡（顶栏进度 / 中部内容 / 吸底动作栏）
+   目标：移动端单屏完成「看词 → 判定」，答案键永远在拇指热区
+   ============================================================ */
+
+.review-shell {
+  --review-dock-bg: rgba(255, 255, 255, 0.86);
+  max-width: 560px;
+  margin: 0 auto;
+  padding: var(--space-3) var(--space-5) 0;
+  min-height: calc(100dvh - 57px); /* 扣除 sticky 顶栏（56px + 1px 边线） */
+  display: flex;
+  flex-direction: column;
+}
+
+html.dark .review-shell {
+  --review-dock-bg: rgba(18, 22, 14, 0.86);
+}
+
+/* 会话进行中隐藏全局底部导航（沉浸模式），✕ 结束后自动恢复 */
+body.review-immersive .bottom-nav {
+  display: none;
+}
+
+/* ---- 顶栏 ---- */
+
+.review-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.review-exit {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background var(--transition-base), color var(--transition-base);
+}
+
+.review-exit:hover {
+  background: var(--color-surface-muted);
+  color: var(--color-text-primary);
+}
+
+.review-progress {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-muted);
+  overflow: hidden;
+}
+
+.review-progress-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 60%, #ffffff));
+  transition: width 240ms var(--ease-out);
+}
+
+.review-counter {
+  flex: none;
+  min-width: 52px;
+  text-align: right;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- 状态条：单行，替代堆叠横幅 ---- */
+
+.review-status {
+  margin: var(--space-2) 0 0;
+  text-align: center;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.review-status.is-warn {
+  color: var(--color-warning-text);
+}
+
+.review-status-action {
+  background: none;
+  border: none;
+  padding: 0 0 0 4px;
+  cursor: pointer;
+  font: inherit;
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+/* ---- 中部内容 ---- */
+
+.review-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.review-stage {
+  margin: auto 0; /* 内容短时垂直居中，长时自然堆叠滚动 */
+  padding: var(--space-5) 0 var(--space-4);
+}
+
+.review-stage-inner {
+  display: grid;
+  gap: var(--space-3);
+  text-align: center;
+}
+
+.review-spell-hint {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  letter-spacing: 0.12em;
+}
+
+.review-shell .flashcard-word {
+  font-size: clamp(2.1rem, 9.5vw, 3rem); /* 长词随屏宽收缩，避免堆行 */
+  margin: var(--space-4) 0;
+}
+
+.review-word-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: var(--space-2);
+  vertical-align: middle;
+}
+
+.review-word-link {
+  color: var(--color-text-muted);
+  opacity: 0.45;
+  text-decoration: none;
+  transition: opacity var(--transition-base);
+}
+
+.review-word-link:hover {
+  opacity: 1;
+}
+
+.review-shell .flashcard-reveal {
+  padding: var(--space-5) var(--space-4);
+  border-width: 1px;
+}
+
+/* 义项折叠：极简 summary，浏览器默认三角替换为细箭头 */
+.review-more {
+  margin-top: var(--space-3);
+  text-align: center;
+}
+
+.review-more summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-muted);
+  list-style: none;
+  transition: background var(--transition-base), color var(--transition-base);
+}
+
+.review-more summary::-webkit-details-marker {
+  display: none;
+}
+
+.review-more summary::after {
+  content: "▾";
+  font-size: 10px;
+  transition: transform var(--transition-base);
+}
+
+.review-more[open] summary::after {
+  transform: rotate(180deg);
+}
+
+.review-more summary:hover {
+  color: var(--color-text-primary);
+}
+
+.review-more-body {
+  margin-top: var(--space-3);
+  display: grid;
+  gap: var(--space-1);
+  text-align: left;
+}
+
+/* 例句截断：英文/中文各最多两行，完整内容见词详情 */
+.review-shell .review-example-en,
+.review-shell .review-example-zh {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ---- 吸底动作栏 ---- */
+
+.review-dock {
+  position: sticky;
+  bottom: 0;
+  z-index: 15;
+  margin: var(--space-4) calc(-1 * var(--space-5)) 0;
+  padding: var(--space-3) var(--space-5) max(var(--space-3), env(safe-area-inset-bottom));
+  background: var(--review-dock-bg);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border-top: 1px solid var(--color-border);
+}
+
+.review-dock-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.review-dock .answer-btn {
+  min-height: 60px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: var(--shadow-lg);
+}
+
+.review-dock .answer-emoji {
+  font-size: 1.2rem;
+}
+
+.review-dock .answer-btn:active,
+.review-dock-btn:active {
+  transform: scale(0.96);
+}
+
+.review-dock-btn {
+  width: 100%;
+  min-height: 60px;
+  border: none;
+  border-radius: 16px;
+  font-size: var(--text-md);
+  font-weight: var(--font-bold);
+  cursor: pointer;
+  transition: transform var(--transition-base), box-shadow var(--transition-base),
+    background var(--transition-base);
+}
+
+.review-dock-btn.primary {
+  background: var(--color-primary);
+  color: #ffffff;
+  box-shadow: var(--shadow-lg);
+}
+
+.review-dock-btn.primary:hover:not(:disabled) {
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--color-primary) 35%, transparent);
+}
+
+.review-dock-btn.primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.review-dock-btn.secondary {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-strong);
+}
+
+.review-dock-stack {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.review-dock-caption {
+  text-align: center;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* 拼写模式 */
+.review-spell-row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.review-spell-row .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.review-spell-row .review-dock-btn.primary {
+  width: auto;
+  padding: 0 var(--space-4);
+}
+
+.review-dock-skip {
+  flex: none;
+  background: none;
+  border: none;
+  padding: var(--space-2);
+  cursor: pointer;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  text-decoration: underline;
+}
+
+.review-spell-result {
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: var(--text-md);
+  font-weight: var(--font-bold);
+}
+
+.review-spell-result.is-ok {
+  color: var(--color-success);
+}
+
+.review-spell-result.is-bad {
+  color: var(--color-danger);
+}
+
+@media (min-width: 641px) {
+  /* 桌面端无底部导航遮挡，dock 改为悬浮圆角卡片 */
+  .review-dock {
+    bottom: var(--space-4);
+    margin: var(--space-4) 0 0;
+    border: 1px solid var(--color-border);
+    border-radius: 18px;
+  }
+}
