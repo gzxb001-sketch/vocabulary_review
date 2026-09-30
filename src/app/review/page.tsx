@@ -122,8 +122,9 @@ export default function ReviewPage() {
   const [spellingInput, setSpellingInput] = useState("");
   const [spellingChecked, setSpellingChecked] = useState(false);
   const [spellingCorrect, setSpellingCorrect] = useState(false);
-  // 拼写验证：随机间隔触发（约每 3~6 个非忘词一次），避免固定节奏可被预期
-  const [nextSpellingAt, setNextSpellingAt] = useState(() => 3 + Math.floor(Math.random() * 4));
+  // 拼写抽查：只验证「认识」的声明（模糊本就没把握，再考拼写挫败感强），
+  // 随机间隔 8~12 个非忘词一次；答后重新随机，避免固定节奏可被预期
+  const [nextSpellingAt, setNextSpellingAt] = useState(() => 8 + Math.floor(Math.random() * 5));
   // 拼写只作练习反馈，单独统计，不写入 SRS 调度（拼写对错 ≠ 认不认识）
   const [spellingStats, setSpellingStats] = useState({ right: 0, wrong: 0 });
   const LAST_SESSION_KEY = "zhumo_last_session";
@@ -368,8 +369,8 @@ export default function ReviewPage() {
       if (!isForgot) {
         const nextCount = nonForgotCount + 1;
         setNonForgotCount(nextCount);
-        // 到达随机阈值时触发一次拼写验证
-        if (!isDemo && nextCount >= nextSpellingAt) {
+        // 拼写抽查只验证「认识」：模糊不必再考拼写；阈值未到则正常推进
+        if (!isDemo && result === "known" && nextCount >= nextSpellingAt) {
           setIsSpelling(true);
           setSpellingChecked(false);
           setSpellingInput("");
@@ -431,11 +432,12 @@ export default function ReviewPage() {
       isCorrect ? { ...prev, right: prev.right + 1 } : { ...prev, wrong: prev.wrong + 1 },
     );
 
-    // 1.5s 后自动进入下一词
+    // 1.5s 后自动进入下一词；并重新随机下一次拼写抽查的间隔（8~12 个非忘词后）
     setTimeout(() => {
       setIsSpelling(false);
       setSpellingChecked(false);
       setSpellingInput("");
+      setNextSpellingAt(nonForgotCount + 8 + Math.floor(Math.random() * 5));
       setIndex((prev) => prev + 1);
     }, 1500);
   }
@@ -450,6 +452,7 @@ export default function ReviewPage() {
       setIsSpelling(false);
       setSpellingChecked(false);
       setSpellingInput("");
+      setNextSpellingAt(nonForgotCount + 8 + Math.floor(Math.random() * 5));
       setIndex((prev) => prev + 1);
     }, 800);
   }
