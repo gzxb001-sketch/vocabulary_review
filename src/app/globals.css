@@ -2588,6 +2588,8 @@ button svg {
     -webkit-backdrop-filter: blur(10px);
     border-top: 1px solid var(--color-border);
     padding: 6px 10px calc(6px + env(safe-area-inset-bottom));
+    /* 关掉系统延迟出现的灰色点击高光，改用下方 :active 即时按压态 */
+    -webkit-tap-highlight-color: transparent;
   }
 
   .bottom-nav-link {
@@ -2604,7 +2606,15 @@ button svg {
     color: var(--color-text-muted);
     font-size: var(--text-xs);
     font-weight: var(--font-medium);
-    transition: color var(--transition-fast), background var(--transition-fast);
+    transition: color var(--transition-fast), background var(--transition-fast),
+      transform var(--transition-fast);
+  }
+
+  /* 触下即亮的按压确认：新页面渲染完成前手指也有即时反馈 */
+  .bottom-nav-link:active {
+    background: var(--color-surface-muted);
+    color: var(--color-text-primary);
+    transform: scale(0.93);
   }
 
   .bottom-nav-link.active {
