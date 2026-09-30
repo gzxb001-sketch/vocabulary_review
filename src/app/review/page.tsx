@@ -639,6 +639,19 @@ export default function ReviewPage() {
     (current.synonyms?.length ?? 0) > 0 ||
     Boolean(current.sourceType || current.sourceNote);
 
+  // 顶栏进度与首页同口径（今日已完成/今日计划）：列表收缩后的「本轮位置 1/2」
+  // 会让用户误以为进度丢失，统一用今日口径才能与首页数字对上。
+  // 演示/专项模式无今日口径，回落本轮位置。
+  const dayProgress =
+    todayMeta && mode !== "stubborn"
+      ? {
+          done: Math.min(todayMeta.reviewedToday + todayAnswered.size, todayMeta.todayPlan),
+          total: todayMeta.todayPlan,
+        }
+      : null;
+  const progressNow = dayProgress ? dayProgress.done : index;
+  const progressTotal = dayProgress ? dayProgress.total : items.length;
+
   return (
     <main className="review-shell fade-in">
       {/* 顶栏：结束入口 + 进度条 + 计数 */}
@@ -658,16 +671,19 @@ export default function ReviewPage() {
         <div
           className="review-progress"
           role="progressbar"
+          aria-label={dayProgress ? "今日复习进度" : "本轮复习进度"}
           aria-valuemin={0}
-          aria-valuemax={items.length}
-          aria-valuenow={index}
+          aria-valuemax={progressTotal}
+          aria-valuenow={progressNow}
         >
           <div
             className="review-progress-fill"
-            style={{ width: `${Math.min(100, (index / items.length) * 100)}%` }}
+            style={{ width: `${Math.min(100, (progressNow / Math.max(1, progressTotal)) * 100)}%` }}
           />
         </div>
-        <span className="review-counter">{index + 1} / {items.length}</span>
+        <span className="review-counter">
+          {dayProgress ? `${dayProgress.done} / ${dayProgress.total}` : `${index + 1} / ${items.length}`}
+        </span>
       </header>
 
       {/* 状态条：按优先级只显示一条，替代原先堆叠的横幅 */}
@@ -684,10 +700,6 @@ export default function ReviewPage() {
         <p className="review-status">体验模式 · 注册后解锁完整功能</p>
       ) : mode === "stubborn" ? (
         <p className="review-status">专项攻克模式 · 只刷反复记不住的词</p>
-      ) : todayMeta ? (
-        <p className="review-status">
-          今日已完成 {Math.min(todayMeta.reviewedToday + todayAnswered.size, todayMeta.todayPlan)} / {todayMeta.todayPlan}
-        </p>
       ) : null}
 
       {/* 中部内容区：唯一可能滚动的区域 */}
