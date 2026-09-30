@@ -109,6 +109,8 @@ export default function ReviewPage() {
   const [todayMeta, setTodayMeta] = useState<{ reviewedToday: number; todayPlan: number } | null>(null);
   // 本会话新作答的词（今日已完成 = reviewedToday + 这里去重后的新增）
   const [todayAnswered, setTodayAnswered] = useState<Set<string>>(() => new Set());
+  // 进度条答后闪光反馈
+  const [progressFlash, setProgressFlash] = useState(false);
   const [wasEndedEarly, setWasEndedEarly] = useState(false);
   // 学习阶梯：忘了的词在本会话内重学，记录每个词已重学次数，避免无限循环
   const [relearnCount, setRelearnCount] = useState<Record<string, number>>({});
@@ -389,6 +391,9 @@ export default function ReviewPage() {
       const clientResultId = newClientResultId();
       await enqueueSubmit({ wordId: current.wordId, result, clientResultId });
       setPendingCount((prev) => prev + 1);
+      // 目标梯度反馈：每答一题进度条闪一下（Duolingo 式「又前进一步」）
+      setProgressFlash(true);
+      window.setTimeout(() => setProgressFlash(false), 520);
       // 今日进度（去重）：同一词的会话内重学不重复计
       setTodayAnswered((prev) => {
         if (prev.has(current.wordId)) return prev;
@@ -473,6 +478,78 @@ export default function ReviewPage() {
   useEffect(() => {
     if (sessionActive) window.scrollTo(0, 0);
   }, [index, sessionActive]);
+
+  // 桌面快捷键（Anki 惯例）：空格翻面，1/2/3 评分；输入框聚焦时忽略
+  useEffect(() => {
+    if (!sessionActive) return;
+    function onKey(e: KeyboardEvent) {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      if (e.code === "Space") {
+        e.preventDefault();
+        if (!revealed && !isSpelling) setRevealed(true);
+        return;
+      }
+      if (revealed && !isSpelling && !pausing) {
+        if (e.key === "1") void submit("known");
+        else if (e.key === "2") void submit("vague");
+        else if (e.key === "3") void submit("forgot");
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sessionActive, revealed, isSpelling, pausing, submit]);
+
+  // —— 滑动评分：右=认识 上=模糊 左=不会，跟手偏移 + 语义色渲染，松手过阈值才提交 ——
+  const stageCardRef = useRef<HTMLDivElement | null>(null);
+  const swipeRef = useRef({ active: false, startX: 0, startY: 0, dx: 0, dy: 0 });
+  const SWIPE_THRESHOLD = 88;
+
+  function clearSwipeVisual() {
+    const el = stageCardRef.current;
+    if (!el) return;
+    el.classList.remove("swipe-known", "swipe-vague", "swipe-forgot");
+  }
+
+  function onStagePointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (!revealed || isSpelling || pausing) return;
+    swipeRef.current = { active: true, startX: e.clientX, startY: e.clientY, dx: 0, dy: 0 };
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
+    const el = stageCardRef.current;
+    if (el) el.style.transition = "none";
+  }
+
+  function onStagePointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const s = swipeRef.current;
+    const el = stageCardRef.current;
+    if (!s.active || !el) return;
+    s.dx = e.clientX - s.startX;
+    s.dy = e.clientY - s.startY;
+    el.style.transform = `translate(${s.dx}px, ${s.dy}px) rotate(${s.dx * 0.03}deg)`;
+    clearSwipeVisual();
+    if (s.dx > 36) el.classList.add("swipe-known");
+    else if (s.dx < -36) el.classList.add("swipe-forgot");
+    else if (s.dy < -36) el.classList.add("swipe-vague");
+  }
+
+  function onStagePointerUp() {
+    const s = swipeRef.current;
+    const el = stageCardRef.current;
+    if (!s.active) return;
+    s.active = false;
+    if (el) {
+      el.style.transition = "transform 200ms var(--ease-out)";
+      el.style.transform = "";
+      clearSwipeVisual();
+    }
+    if (s.dx > SWIPE_THRESHOLD) { navigator.vibrate?.(12); void submit("known"); }
+    else if (s.dx < -SWIPE_THRESHOLD) { navigator.vibrate?.(12); void submit("forgot"); }
+    else if (s.dy < -SWIPE_THRESHOLD) { navigator.vibrate?.(12); void submit("vague"); }
+  }
+
+  function onStageClick() {
+    if (!revealed && !isSpelling) setRevealed(true);
+  }
 
   // 提前结束本轮
   function endSession() {
@@ -678,7 +755,7 @@ export default function ReviewPage() {
           aria-valuenow={progressNow}
         >
           <div
-            className="review-progress-fill"
+            className={`review-progress-fill${progressFlash ? " is-flash" : ""}`}
             style={{ width: `${Math.min(100, (progressNow / Math.max(1, progressTotal)) * 100)}%` }}
           />
         </div>
@@ -697,6 +774,8 @@ export default function ReviewPage() {
         </p>
       ) : pendingCount > 0 ? (
         <p className="review-status">{pendingCount} 条答题结果将在联网后自动同步</p>
+      ) : dayProgress && dayProgress.done >= dayProgress.total ? (
+        <p className="review-status is-done">🎉 今日计划已完成 · 继续巩固或到此休息都很好</p>
       ) : isDemo ? (
         <p className="review-status">体验模式 · 注册后解锁完整功能</p>
       ) : mode === "stubborn" ? (
@@ -706,7 +785,15 @@ export default function ReviewPage() {
       {/* 中部内容区：唯一可能滚动的区域；词卡是页面主体 */}
       <div className="review-body">
         <div className="review-stage">
-          <div className={`review-stage-card${revealed && !isSpelling ? " is-revealed" : ""}`}>
+          <div
+            ref={stageCardRef}
+            className={`review-stage-card${revealed && !isSpelling ? " is-revealed" : ""}`}
+            onClick={onStageClick}
+            onPointerDown={onStagePointerDown}
+            onPointerMove={onStagePointerMove}
+            onPointerUp={onStagePointerUp}
+            onPointerCancel={onStagePointerUp}
+          >
             {!isSpelling && (
               <Link
                 href={`/words/${current.wordId}`}
@@ -715,6 +802,7 @@ export default function ReviewPage() {
                 className="review-card-link"
                 title="查看详情"
                 aria-label="查看词详情"
+                onClick={(e) => e.stopPropagation()}
               >
                 <IconExternalLink />
               </Link>
@@ -732,7 +820,15 @@ export default function ReviewPage() {
                 {revealed && current.phonetic && (
                   <p className="review-hero-phonetic">{current.phonetic}</p>
                 )}
-                <SpeakButton text={current.displayText} />
+                <span onClick={(e) => e.stopPropagation()}>
+                  <SpeakButton text={current.displayText} />
+                </span>
+                {!revealed && current.sourceContext && (
+                  <p className="review-memory-cue">
+                    <span className="review-cue-tag">原句</span>
+                    <span className="review-cue-text">&ldquo;{current.sourceContext}&rdquo;</span>
+                  </p>
+                )}
                 {!revealed && <p className="review-stage-hint">回忆它的意思，再翻面核对</p>}
               </>
             )}
