@@ -181,7 +181,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="container auth-paper fade-in">
+    <main className="container fade-in">
       <div className="card stack" style={{ maxWidth: 420, margin: "var(--space-8) auto" }}>
         <h1 className="title" style={{ textAlign: "center" }}>竹墨词库</h1>
         <p className="subtitle" style={{ textAlign: "center" }}>
