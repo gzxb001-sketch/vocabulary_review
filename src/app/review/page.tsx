@@ -82,6 +82,18 @@ function newClientResultId(): string {
 const SESSION_KEY = "zhumo-review-session";
 // 拼写抽查开关：持久化到 localStorage（"0"=关，缺省=开）
 const SPELLING_ENABLED_KEY = "zhumo-spelling-enabled";
+// 语境回忆开关：带原句的词用挖空句面回忆（"0"=关，缺省=开）
+const CONTEXT_MODE_KEY = "zhumo-context-mode";
+
+/** 语境挖空：把原句中的目标词（忽略大小写，允许常见屈折后缀）替换为下划线；未出现时返回 null */
+function makeCloze(sentence: string, word: string): string | null {
+  const w = word.trim();
+  if (!w) return null;
+  const escaped = w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`\\b${escaped}(?:s|es|ed|d|ing|ly)?\\b`, "gi");
+  if (sentence.search(re) === -1) return null;
+  return sentence.replace(re, "＿＿＿");
+}
 
 // 会话进度存档：按「日期 + 词表 wordId + 已答位置」持久化，重开页面可接续
 type SavedSession = {
@@ -130,6 +142,8 @@ export default function ReviewPage() {
   const [nextSpellingAt, setNextSpellingAt] = useState(() => 8 + Math.floor(Math.random() * 5));
   // 拼写抽查开关（用户可在拼写页/休息屏/总结屏切换，持久化）
   const [spellingEnabled, setSpellingEnabled] = useState(true);
+  // 语境回忆开关（带原句的词用挖空句面回忆，持久化，默认开）
+  const [contextMode, setContextMode] = useState(true);
   // 拼写只作练习反馈，单独统计，不写入 SRS 调度（拼写对错 ≠ 认不认识）
   const [spellingStats, setSpellingStats] = useState({ right: 0, wrong: 0 });
   const LAST_SESSION_KEY = "zhumo_last_session";
@@ -158,6 +172,8 @@ export default function ReviewPage() {
     try {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setSpellingEnabled(localStorage.getItem(SPELLING_ENABLED_KEY) !== "0");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setContextMode(localStorage.getItem(CONTEXT_MODE_KEY) !== "0");
     } catch {}
   }, []);
 
@@ -165,6 +181,13 @@ export default function ReviewPage() {
     setSpellingEnabled(next);
     try {
       localStorage.setItem(SPELLING_ENABLED_KEY, next ? "1" : "0");
+    } catch {}
+  }
+
+  function setContextToggle(next: boolean) {
+    setContextMode(next);
+    try {
+      localStorage.setItem(CONTEXT_MODE_KEY, next ? "1" : "0");
     } catch {}
   }
 
@@ -801,6 +824,11 @@ export default function ReviewPage() {
     hiddenCount > 0 ||
     (current.synonyms?.length ?? 0) > 0 ||
     Boolean(current.sourceType || current.sourceNote);
+  // 语境挖空句面：未翻面 + 语境回忆开启 + 原句含目标词时使用
+  const clozeSentence =
+    !revealed && contextMode && current.sourceContext
+      ? makeCloze(current.sourceContext, current.displayText)
+      : null;
 
   // 顶栏进度与首页同口径（今日已完成/今日计划）：列表收缩后的「本轮位置 1/2」
   // 会让用户误以为进度丢失，统一用今日口径才能与首页数字对上。
@@ -902,22 +930,54 @@ export default function ReviewPage() {
                   不想被抽查？永久关闭拼写
                 </button>
               </>
+            ) : !revealed && clozeSentence ? (
+              <>
+                <p className="review-stage-hint">结合句子，回忆划线处的词</p>
+                <p className="review-cloze">{clozeSentence}</p>
+                <div className="review-cloze-meta">
+                  <span className="review-cue-tag">{current.displayText.length} 个字母</span>
+                  <span className="review-cue-tag">首字母 {current.displayText[0].toUpperCase()}</span>
+                </div>
+                <button
+                  className="review-spell-off"
+                  onClick={(e) => { e.stopPropagation(); setContextToggle(false); }}
+                >
+                  不用语境，直接看词面 →
+                </button>
+              </>
             ) : (
               <>
                 <h1 className="review-hero-word">{current.displayText}</h1>
                 {revealed && current.phonetic && (
                   <p className="review-hero-phonetic">{current.phonetic}</p>
                 )}
-                <span onClick={(e) => e.stopPropagation()}>
-                  <SpeakButton text={current.displayText} />
-                </span>
+                {!revealed && (
+                  <span onClick={(e) => e.stopPropagation()}>
+                    <SpeakButton text={current.displayText} />
+                  </span>
+                )}
                 {!revealed && current.sourceContext && (
                   <p className="review-memory-cue">
                     <span className="review-cue-tag">原句</span>
                     <span className="review-cue-text">&ldquo;{current.sourceContext}&rdquo;</span>
                   </p>
                 )}
-                {!revealed && <p className="review-stage-hint">回忆它的意思，再翻面核对</p>}
+                {!revealed && (
+                  <p className="review-stage-hint">
+                    回忆它的意思，再翻面核对
+                    {current.sourceContext && !contextMode && (
+                      <>
+                        {" · "}
+                        <button
+                          className="review-cue-link"
+                          onClick={(e) => { e.stopPropagation(); setContextToggle(true); }}
+                        >
+                          语境回忆 →
+                        </button>
+                      </>
+                    )}
+                  </p>
+                )}
               </>
             )}
           </div>

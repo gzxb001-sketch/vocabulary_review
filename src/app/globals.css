@@ -3529,3 +3529,31 @@ a.home-stat-card:hover {
   border-radius: 16px;
   box-shadow: var(--shadow-lg);
 }
+
+/* 语境回忆：挖空句面 */
+.review-cloze {
+  margin: var(--space-2) 0 0;
+  font-size: 1.08rem;
+  line-height: 2;
+  color: var(--color-text-primary);
+  text-align: center;
+  word-break: break-word;
+}
+
+.review-cloze-meta {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: center;
+  margin-top: var(--space-2);
+}
+
+.review-cue-link {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
