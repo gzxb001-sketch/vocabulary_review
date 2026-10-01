@@ -3310,3 +3310,206 @@ body.review-immersive .bottom-nav {
     border-radius: 18px;
   }
 }
+
+/* ============================================================
+   首页 · 操作台式排版（v2）
+   第一屏只回答「今天做什么」；数据去重；设置类收折
+   ============================================================ */
+
+/* 顶栏退出：全页视觉上最安静的元素 */
+.user-bar-logout {
+  background: none;
+  border: none;
+  padding: var(--space-1) var(--space-2);
+  cursor: pointer;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color var(--transition-fast);
+}
+
+.user-bar-logout:hover {
+  color: var(--color-danger);
+}
+
+/* hero 顶行：日期 + 打卡（情感锚点） */
+.hero-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+  color: #ffffff;
+  opacity: 0.72;
+  position: relative;
+}
+
+.hero-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #fde68a;
+  font-weight: var(--font-semibold);
+}
+
+.hero-label {
+  margin: var(--space-5) 0 0;
+  font-size: var(--text-xs);
+  letter-spacing: 0.18em;
+  color: #ffffff;
+  opacity: 0.66;
+  position: relative;
+}
+
+/* 今日 X / Y：Y 弱化为次级，主角是已完成数 */
+.hero-due-total {
+  font-size: 0.42em;
+  font-weight: var(--font-semibold);
+  opacity: 0.62;
+  margin-left: 2px;
+}
+
+/* 今日进度条（目标梯度可视化） */
+.hero-bar {
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.18);
+  overflow: hidden;
+  margin: var(--space-3) 0 var(--space-2);
+  position: relative;
+}
+
+.hero-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: #f0f5e8;
+  transition: width 400ms var(--ease-out);
+}
+
+.hero-due-count.is-rest {
+  font-size: 40px;
+}
+
+/* 录词次级入口：可达但不稀释主按钮 */
+.hero-quick-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  margin-top: 10px;
+  position: relative;
+}
+
+.hero-quick {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  text-decoration: none;
+  transition: background var(--transition-base);
+}
+
+.hero-quick:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.hero-btn-primary.is-full {
+  width: 100%;
+  height: 52px;
+  font-size: var(--text-md);
+}
+
+/* 冲刺横幅降噪：从整宽色块降为一行浅色提示 */
+.sprint-entry {
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  background: transparent;
+  color: var(--color-primary);
+  font-size: var(--text-xs);
+  text-align: left;
+  opacity: 0.85;
+  margin-bottom: var(--space-4);
+}
+
+.sprint-entry:hover {
+  opacity: 1;
+  background: var(--color-primary-bg);
+}
+
+/* 登录态统计网格：三格（已掌握/词条总数/待复习） */
+.home-stats-row.is-user {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 640px) {
+  .home-stats-row.is-user {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  /* 三卡布局下不再需要跨列 */
+  .home-stats-row.is-user .home-stat-card.is-mastered {
+    grid-column: auto;
+  }
+}
+
+/* 待复习卡可点（跳转词库待复习筛选） */
+a.home-stat-card {
+  text-decoration: none;
+  transition: transform var(--transition-base), box-shadow var(--transition-base);
+}
+
+a.home-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* 偏好设置折叠（邮件提醒等设置类内容） */
+.home-prefs {
+  margin: var(--space-4) 0 var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4);
+}
+
+.home-prefs > summary {
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  list-style: none;
+}
+
+.home-prefs > summary::-webkit-details-marker {
+  display: none;
+}
+
+.home-prefs > summary::before {
+  content: "▸ ";
+}
+
+.home-prefs[open] > summary::before {
+  content: "▾ ";
+}
+
+.home-prefs[open] {
+  padding-bottom: var(--space-4);
+}
+
+/* 学习记录合并卡：数据概览 + 最近动态（减少卡片汤） */
+.study-record-block {
+  border-top: 1px dashed var(--color-border);
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+}
+
+.study-record-sub {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+}

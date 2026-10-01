@@ -7,7 +7,7 @@ export default function LogoutButton() {
       await fetch("/api/auth/login", { method: "DELETE" });
       window.location.href = "/";
     }}>
-      <button type="submit" className="link-button">退出</button>
+      <button type="submit" className="user-bar-logout">退出</button>
     </form>
   );
 }

@@ -124,6 +124,13 @@ const SOURCE_LABELS: Record<string, string> = {
   longSentence: "长难句", translation: "翻译", other: "其他",
 };
 
+/** 北京时区的「X月X日 周X」（首页开屏日期锚点） */
+function formatTodayCN(): string {
+  const shifted = new Date(Date.now() + 8 * 60 * 60 * 1000);
+  const weekdays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+  return `${shifted.getUTCMonth() + 1}月${shifted.getUTCDate()}日 ${weekdays[shifted.getUTCDay()]}`;
+}
+
 export default async function HomePage() {
   let userId: string | null = null;
   let user: { email: string; examDate: Date | null } | null = null;
@@ -232,38 +239,54 @@ export default async function HomePage() {
         </section>
       ) : (
         <section className="hero-card-home">
-          <p className="hero-brand">竹墨词库</p>
-          {data.streak > 1 && (
-            <p className="hero-streak">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M13.5 0.67s0.74 2.65 0.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l0.03-0.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5 0.67z" fill="#fde68a" />
-              </svg>
-              已连续打卡 <strong>{data.streak}</strong> 天
-            </p>
-          )}
+          <div className="hero-topline">
+            <span>{formatTodayCN()}</span>
+            {data.streak > 0 && (
+              <span className="hero-streak">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M13.5 0.67s0.74 2.65 0.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l0.03-0.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5 0.67z" fill="#fde68a" />
+                </svg>
+                连续 {data.streak} 天
+              </span>
+            )}
+          </div>
+          <p className="hero-label">今日复习</p>
           {data.todayPlan > 0 ? (
             <>
-              <p className="hero-due-count">{data.todayPlan}</p>
-              <p className="hero-due-label">个词 · 今日计划</p>
+              <p className="hero-due-count">
+                {data.reviewedToday}
+                <span className="hero-due-total"> / {data.todayPlan}</span>
+              </p>
+              <div
+                className="hero-bar"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={data.todayPlan}
+                aria-valuenow={data.reviewedToday}
+              >
+                <div
+                  className="hero-bar-fill"
+                  style={{ width: `${Math.min(100, (data.reviewedToday / Math.max(1, data.todayPlan)) * 100)}%` }}
+                />
+              </div>
               <p className="hero-due-hint">
-                今日已复习 {data.reviewedToday} / {data.todayPlan} 个词
                 {data.remainingDue > 0
-                  ? ` · 还有 ${data.remainingDue} 个往期词顺延到之后`
-                  : " · 完成后即可休息"}
+                  ? `还有 ${data.remainingDue} 个往期词顺延到之后`
+                  : "完成后即可休息"}
               </p>
             </>
           ) : (
             <>
-              <p className="hero-due-label">今天没有待复习</p>
-              <p className="hero-due-hint mt-1">
-                可以去录入新词，或者明天再来
-              </p>
+              <p className="hero-due-count is-rest">✓</p>
+              <p className="hero-due-hint">今天没有待复习，休息或录词都可以</p>
             </>
           )}
           <div className="hero-btns">
-            <Link href="/review" className="hero-btn-primary">开始复习</Link>
-            <Link href="/manual" className="hero-btn-secondary">手动录词</Link>
-            <Link href="/capture" className="hero-btn-secondary">拍照录词</Link>
+            <Link href="/review" className="hero-btn-primary is-full">开始复习</Link>
+            <div className="hero-quick-row">
+              <Link href="/capture" className="hero-quick">📷 拍照录词</Link>
+              <Link href="/manual" className="hero-quick">✏️ 手动录词</Link>
+            </div>
           </div>
         </section>
       )}
@@ -297,7 +320,7 @@ export default async function HomePage() {
           </div>
         </section>
       ) : (
-        <section className="home-stats-row">
+        <section className="home-stats-row is-user">
           <div className="home-stat-card is-mastered">
             <span
               className="home-stat-num"
@@ -311,18 +334,10 @@ export default async function HomePage() {
             <span className="home-stat-num">{data.totalWordsCount}</span>
             <span className="home-stat-label">词条总数</span>
           </div>
-          <div className="home-stat-card is-due">
+          <Link href="/words?filter=due" className="home-stat-card">
             <span className="home-stat-num">{data.dueCount}</span>
             <span className="home-stat-label">待复习</span>
-          </div>
-          <div className="home-stat-card">
-            <span className="home-stat-num">{data.todayAddedCount}</span>
-            <span className="home-stat-label">今日新增</span>
-          </div>
-          <div className="home-stat-card">
-            <span className="home-stat-num">{data.reviewedToday}</span>
-            <span className="home-stat-label">今日复习</span>
-          </div>
+          </Link>
         </section>
       )}
 
@@ -360,11 +375,11 @@ export default async function HomePage() {
         <span className="bamboo-divider-icon" />
       </div>
 
-      {/* 学习数据（仅登录用户）：本周概览 + 认识率趋势 + 打卡记录 */}
+      {/* 学习记录（仅登录用户）：数据概览 + 最近动态，合并为一张卡减少卡片汤 */}
       {!isGuest && (
-        <section className="card study-data-card">
+        <section className="card study-record">
           <div className="home-col-header">
-            <h2 className="home-section-title">学习数据</h2>
+            <h2 className="home-section-title">学习记录</h2>
           </div>
           <div className="stat-row">
             <div>
@@ -380,10 +395,50 @@ export default async function HomePage() {
           </div>
           <WeeklyTrendChart />
           <ReviewHeatmap />
+
+          <div className="study-record-block">
+            <div className="home-col-header">
+              <h3 className="study-record-sub">最近新增</h3>
+              <Link href="/words/recent" className="home-col-more">全部 →</Link>
+            </div>
+            {data.recentWords.length === 0 ? (
+              <p className="empty-hint">还没有词条</p>
+            ) : (
+              <div className="home-tag-cloud">
+                {data.recentWords.map((word) => (
+                  <Link key={word.id} href={`/words/${word.id}`} className="home-word-tag">
+                    {word.displayText}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="study-record-block">
+            <div className="home-col-header">
+              <h3 className="study-record-sub">最近复习</h3>
+              <Link href="/review" className="home-col-more">全部 →</Link>
+            </div>
+            {data.recentReviews.length === 0 ? (
+              <p className="empty-hint">还没有复习记录</p>
+            ) : (
+              <div className="home-tag-cloud">
+                {data.recentReviews.map((review) => (
+                  <Link
+                    key={review.id}
+                    href={`/words/${review.word.id}`}
+                    className={`home-word-tag tag-${review.reviewResult}`}
+                  >
+                    {review.word.displayText}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
         </section>
       )}
 
-      {/* 最近 */}
+      {/* 最近（游客）：预置体验词 + 注册引导 */}
       {isGuest ? (
         <>
           <section className="home-two-col">
@@ -422,49 +477,7 @@ export default async function HomePage() {
             <Link href="/login" className="link-button">免费注册</Link>
           </div>
         </>
-      ) : (
-        <section className="home-two-col">
-          <div className="card home-col-card">
-            <div className="home-col-header">
-              <h2 className="home-section-title">最近新增</h2>
-              <Link href="/words/recent" className="home-col-more">全部 →</Link>
-            </div>
-            {data.recentWords.length === 0 ? (
-              <p className="empty-hint">还没有词条</p>
-            ) : (
-              <div className="home-tag-cloud">
-                {data.recentWords.map((word) => (
-                  <Link key={word.id} href={`/words/${word.id}`} className="home-word-tag">
-                    {word.displayText}
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="card home-col-card">
-            <div className="home-col-header">
-              <h2 className="home-section-title">最近复习</h2>
-              <Link href="/review" className="home-col-more">全部 →</Link>
-            </div>
-            {data.recentReviews.length === 0 ? (
-              <p className="empty-hint">还没有复习记录</p>
-            ) : (
-              <div className="home-tag-cloud">
-                {data.recentReviews.map((review) => (
-                  <Link
-                    key={review.id}
-                    href={`/words/${review.word.id}`}
-                    className={`home-word-tag tag-${review.reviewResult}`}
-                  >
-                    {review.word.displayText}
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
-      )}
+      ) : null}
 
       {/* 顽固词 — 仅登录用户 */}
       {!isGuest && data.stubbornWords.length > 0 && (
@@ -489,8 +502,13 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* 每日复习提醒 — 低频设置类信息，降权到页面尾部 */}
-      {!isGuest && <EmailReminder />}
+      {/* 每日复习提醒 — 设置类内容，收入偏好折叠区 */}
+      {!isGuest && (
+        <details className="home-prefs">
+          <summary className="source-detail-summary">偏好设置</summary>
+          <EmailReminder />
+        </details>
+      )}
 
       {/* 来源分布 — 仅登录用户 */}
       {!isGuest && data.sourceDistribution.length > 0 && (
