@@ -56,7 +56,10 @@ export default function RootLayout({
         <nav className="topnav" aria-label="主导航">
           <div className="topnav-inner">
             <Link href="/" className="topnav-brand" aria-label="回到首页">
-              竹墨词库
+              <span className="brand-seal" aria-hidden="true">
+                竹<br />墨
+              </span>
+              <span className="topnav-brand-text">竹墨词库</span>
             </Link>
             <NavLinks />
           </div>

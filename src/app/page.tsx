@@ -131,6 +131,15 @@ function formatTodayCN(): string {
   return `${shifted.getUTCMonth() + 1}月${shifted.getUTCDate()}日 ${weekdays[shifted.getUTCDay()]}`;
 }
 
+const CN_DIGITS = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
+
+/** 汉字数字（一~九十九）：开屏日期的文气写法 */
+function cnNumber(n: number): string {
+  if (n <= 10) return CN_DIGITS[n] ?? String(n);
+  if (n < 20) return "十" + (n % 10 ? CN_DIGITS[n % 10] : "");
+  return CN_DIGITS[Math.floor(n / 10)] + "十" + (n % 10 ? CN_DIGITS[n % 10] : "");
+}
+
 export default async function HomePage() {
   let userId: string | null = null;
   let user: { email: string; examDate: Date | null } | null = null;
@@ -205,7 +214,7 @@ export default async function HomePage() {
   const isGuest = !user;
 
   return (
-    <main className="container">
+    <main className="container home-paper">
       {/* User bar */}
       {user ? (
         <div className="user-bar">
@@ -238,19 +247,27 @@ export default async function HomePage() {
           </div>
         </section>
       ) : (
-        <section className="hero-card-home">
+        <section className="hero-ink">
+          <svg className="hero-bamboo" viewBox="0 0 120 170" fill="none" aria-hidden="true">
+            <path d="M96 8 C 88 52, 86 100, 94 164" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+            <path d="M91 34 C 84 32, 76 33, 70 37" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity="0.7" />
+            <path d="M90 74 C 82 70, 72 70, 64 74" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity="0.7" />
+            <path d="M70 37 C 58 30, 44 28, 30 32 C 44 22, 62 24, 74 34 Z" fill="currentColor" opacity="0.75" />
+            <path d="M64 74 C 52 66, 38 63, 24 66 C 38 56, 56 58, 68 70 Z" fill="currentColor" opacity="0.6" />
+            <path d="M93 120 C 84 114, 72 112, 60 114 C 72 105, 88 108, 97 116 Z" fill="currentColor" opacity="0.5" />
+          </svg>
           <div className="hero-topline">
             <span>{formatTodayCN()}</span>
             {data.streak > 0 && (
               <span className="hero-streak">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M13.5 0.67s0.74 2.65 0.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l0.03-0.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5 0.67z" fill="#fde68a" />
+                  <path d="M13.5 0.67s0.74 2.65 0.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l0.03-0.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5 0.67z" fill="#d97b3f" />
                 </svg>
-                连续 {data.streak} 天
+                连续 {cnNumber(data.streak)} 天
               </span>
             )}
           </div>
-          <p className="hero-label">今日复习</p>
+          <p className="hero-label">今 日 复 习</p>
           {data.todayPlan > 0 ? (
             <>
               <p className="hero-due-count">
@@ -258,16 +275,18 @@ export default async function HomePage() {
                 <span className="hero-due-total"> / {data.todayPlan}</span>
               </p>
               <div
-                className="hero-bar"
+                className="brush-bar"
                 role="progressbar"
                 aria-valuemin={0}
                 aria-valuemax={data.todayPlan}
                 aria-valuenow={data.reviewedToday}
               >
                 <div
-                  className="hero-bar-fill"
+                  className="brush-fill"
                   style={{ width: `${Math.min(100, (data.reviewedToday / Math.max(1, data.todayPlan)) * 100)}%` }}
-                />
+                >
+                  <span className="brush-dot" />
+                </div>
               </div>
               <p className="hero-due-hint">
                 {data.remainingDue > 0
@@ -277,15 +296,15 @@ export default async function HomePage() {
             </>
           ) : (
             <>
-              <p className="hero-due-count is-rest">✓</p>
+              <p className="hero-due-count is-rest">休</p>
               <p className="hero-due-hint">今天没有待复习，休息或录词都可以</p>
             </>
           )}
           <div className="hero-btns">
-            <Link href="/review" className="hero-btn-primary is-full">开始复习</Link>
+            <Link href="/review" className="btn-ink is-full">开始复习</Link>
             <div className="hero-quick-row">
-              <Link href="/capture" className="hero-quick">📷 拍照录词</Link>
-              <Link href="/manual" className="hero-quick">✏️ 手动录词</Link>
+              <Link href="/capture" className="btn-outline">📷 拍照录词</Link>
+              <Link href="/manual" className="btn-outline">✏️ 手动录词</Link>
             </div>
           </div>
         </section>
@@ -375,9 +394,9 @@ export default async function HomePage() {
         <span className="bamboo-divider-icon" />
       </div>
 
-      {/* 学习记录（仅登录用户）：数据概览 + 最近动态，合并为一张卡减少卡片汤 */}
+      {/* 学习记录（仅登录用户）：数据概览 + 最近动态，宣纸式发丝线分区 */}
       {!isGuest && (
-        <section className="card study-record">
+        <section className="study-record">
           <div className="home-col-header">
             <h2 className="home-section-title">学习记录</h2>
           </div>
@@ -481,7 +500,7 @@ export default async function HomePage() {
 
       {/* 顽固词 — 仅登录用户 */}
       {!isGuest && data.stubbornWords.length > 0 && (
-        <section className="card card-compact mt-4">
+        <section className="study-section mt-4">
           <div className="home-col-header">
             <h2 className="home-section-title">顽固词 · 集中攻克</h2>
             <div className="home-col-actions">
@@ -502,7 +521,7 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* 每日复习提醒 — 设置类内容，收入偏好折叠区 */}
+      {/* 每日复习提醒 — 设置类内容，收入偏好分区 */}
       {!isGuest && (
         <details className="home-prefs">
           <summary className="source-detail-summary">偏好设置</summary>
