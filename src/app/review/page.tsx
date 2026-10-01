@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import SpeakButton from "../ui/speak-button";
 import { ANALYTICS_EVENTS, trackEvent } from "@/lib/analytics";
 import {
@@ -12,6 +12,7 @@ import {
   resumeIndex,
 } from "@/lib/review-offline";
 import { beijingDateStr } from "@/lib/user-day";
+import { drawTodayCard } from "@/lib/share-card";
 import { DEMO_WORDS, type DemoReviewItem } from "@/lib/demo-words";
 import { REVIEW_CAPS } from "@/lib/review-config";
 import {
@@ -532,6 +533,42 @@ export default function ReviewPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [sessionActive, revealed, isSpelling, pausing, submit]);
 
+  // 今日成果卡：会话完成（非演示）时绘制可保存/分享的成绩图。
+  // Canvas 绘制无持久副作用，用 useMemo 派生避免 effect 级联渲染。
+  const isComplete = !loading && !isDemo && items.length > 0 && index >= items.length;
+  const cardUrl = useMemo(() => {
+    if (!isComplete) return null;
+    const now = new Date();
+    const done = todayMeta
+      ? Math.min(todayMeta.reviewedToday + todayAnswered.size, todayMeta.todayPlan)
+      : Math.min(index, planCount || index);
+    return drawTodayCard({
+      dateLabel: `${now.getMonth() + 1}月${now.getDate()}日 · ${["周日", "周一", "周二", "周三", "周四", "周五", "周六"][now.getDay()]}`,
+      done,
+      plan: todayMeta?.todayPlan || planCount || index,
+      known: sessionResults.known,
+      vague: sessionResults.vague,
+      forgot: sessionResults.forgot,
+    });
+  }, [isComplete, index, planCount, sessionResults, todayMeta, todayAnswered]);
+
+  // 保存 / 分享：移动端优先走系统分享面板，不支持时回退为下载
+  async function shareOrSaveCard() {
+    if (!cardUrl) return;
+    try {
+      const blob = await (await fetch(cardUrl)).blob();
+      const file = new File([blob], `zhumo-today-${beijingDateStr()}.png`, { type: "image/png" });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: "竹墨词库 · 今日复习" });
+        return;
+      }
+    } catch {}
+    const a = document.createElement("a");
+    a.href = cardUrl;
+    a.download = `zhumo-today-${beijingDateStr()}.png`;
+    a.click();
+  }
+
   // —— 滑动评分：右=认识 上=模糊 左=不会，跟手偏移 + 语义色渲染，松手过阈值才提交 ——
   const stageCardRef = useRef<HTMLDivElement | null>(null);
   const swipeRef = useRef({ active: false, startX: 0, startY: 0, dx: 0, dy: 0 });
@@ -699,6 +736,16 @@ export default function ReviewPage() {
                 </p>
               );
             })()}
+            {cardUrl && (
+              <div className="share-card-block">
+                {/* data URL 本地生成，next/image 不适用 */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={cardUrl} alt="今日成果卡" className="share-card-img" />
+                <button className="button button-secondary" onClick={shareOrSaveCard}>
+                  保存 / 分享成果卡
+                </button>
+              </div>
+            )}
             <div className="link-row">
               <Link href="/" className="link-button">返回首页</Link>
               {!wasEndedEarly && (

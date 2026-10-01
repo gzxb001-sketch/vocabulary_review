@@ -145,6 +145,10 @@ export async function syncQueue(timeoutMs = 8000): Promise<{
       if (res.ok) {
         await removeFromQueue(entry.id);
         synced++;
+      } else if (res.status === 404) {
+        // 词/复习计划在服务端已不存在（如词条被删除）：永久失败，
+        // 必须出队丢弃——否则这条记录会在每次同步时重试并阻塞队列
+        await removeFromQueue(entry.id);
       }
     } catch {
       // 网络不可用/超时，停止同步（队列保留，下次继续）

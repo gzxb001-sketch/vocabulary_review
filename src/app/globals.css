@@ -3513,3 +3513,19 @@ a.home-stat-card:hover {
   font-weight: var(--font-semibold);
   color: var(--color-text-primary);
 }
+
+/* 今日成果卡（复习总结页内的可保存/分享成绩图） */
+.share-card-block {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: center;
+  margin-top: var(--space-4);
+}
+
+.share-card-img {
+  width: 100%;
+  max-width: 300px;
+  display: block;
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
+}
