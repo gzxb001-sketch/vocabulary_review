@@ -31,14 +31,19 @@ function mockReviews(days: number[]): void {
 }
 
 describe("toDayKey", () => {
-  it("生成本地时区 YYYY-M-D 键（月/日不带前导零）", () => {
-    expect(toDayKey(new Date(2026, 0, 5))).toBe("2026-0-5");
-    expect(toDayKey(new Date(2026, 8, 2))).toBe("2026-8-2");
-    expect(toDayKey(new Date(2026, 11, 31))).toBe("2026-11-31");
+  it("生成北京时区 YYYY-M-D 键（月/日不带前导零，月份 0 基）", () => {
+    // 用 UTC 锚点构造「北京时间的时刻」，测试不依赖运行机所在时区
+    // 2026-01-04T16:30Z = 北京 1月5日 00:30
+    expect(toDayKey(new Date("2026-01-04T16:30:00Z"))).toBe("2026-0-5");
+    // 2026-09-02T08:05Z = 北京 9月2日 16:05
+    expect(toDayKey(new Date("2026-09-02T08:05:00Z"))).toBe("2026-8-2");
+    // 2026-12-30T16:30Z = 北京 12月31日 00:30
+    expect(toDayKey(new Date("2026-12-30T16:30:00Z"))).toBe("2026-11-31");
   });
 
   it("同一天不同时刻生成相同键", () => {
-    expect(toDayKey(new Date(2026, 8, 2, 0, 5))).toBe(toDayKey(new Date(2026, 8, 2, 23, 59)));
+    // 北京 9月2日 的凌晨（前一日 17:00Z）与深夜（当日 15:00Z）→ 同一个键
+    expect(toDayKey(new Date("2026-09-01T17:00:00Z"))).toBe(toDayKey(new Date("2026-09-02T15:00:00Z")));
   });
 });
 

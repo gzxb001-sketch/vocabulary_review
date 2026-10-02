@@ -5,6 +5,12 @@
 
 ---
 
+## 2026-10-01 · CI 门禁调试闭环 —— 锁文件跨平台补全 + 时区无关测试
+
+- **发生了什么**：CI 门禁上线后连续拦截两次失败，正是它该拦的问题。①`npm ci` 失败：Windows 上安装依赖时 npm 会把 sharp-wasm32 路径的 `@emnapi/runtime+core` 从锁文件剪掉（跨平台锁文件已知问题），Linux 校验缺条目——以 registry 官方 integrity 手工补入根级 optional 条目，并把两个包写入 package.json optionalDependencies 防再次被剪；②vitest 失败：`stats.test.ts` 用"本地时间"构造日期（`new Date(2026,8,2,23,59)`），假设运行机时区是北京——UTC 的 CI 机器上跨到第二天。改为 UTC 锚点构造北京时刻，测试与时区无关（本地 UTC+8 与强制 UTC 双跑验证）。
+- **同时加固了 CI 的可诊断性**：安装依赖与测试失败时自动把 npm 日志/vitest 输出尾部写入 Job Summary。
+- **迭代原因**：CI 门禁首次真实运行即暴露两个环境差异问题——门禁按设计拦截，诊断闭环走通（匿名 API 读不到私有日志，靠失败输出进 Summary + 用户贴回，最终形成自服务诊断）。
+
 ## 2026-10-01 · 第三轮安全排查 —— 依赖漏洞修复 + CI 门禁（防复发基建）
 
 - **修改了什么**：`npm audit` 发现 12 个依赖漏洞（1 严重/10 高危）并修复——postcss（任意文件读取×3）、sharp（libvips/libheif 继承 CVE）经 `audit fix` 修复；nodemailer 9.1.1 → 10.0.13（addressparser DoS×2，跨大版本升级，mailer API 兼容已验证）；新增 `.github/workflows/ci.yml`——每次推送/PR 自动跑「漏洞扫描 → lint → tsc → 119 测试 → build」完整门禁。
