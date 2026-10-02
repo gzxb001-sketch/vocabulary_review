@@ -145,9 +145,11 @@ export default function ReviewPage() {
   const [spellingEnabled, setSpellingEnabled] = useState(() =>
     typeof window === "undefined" ? true : localStorage.getItem(SPELLING_ENABLED_KEY) !== "0",
   );
-  // 语境回忆开关（带原句的词用挖空句面回忆，持久化，默认开）
+  // 语境回忆开关（带原句的词用挖空句面回忆，持久化）。
+  // 默认关：产品初衷是碎片化快速过卡，检索阶段不加前置任务；
+  // 语境的强化放在翻面后的原句展示（编码阶段），挖空留给想加深练习的用户自愿开启
   const [contextMode, setContextMode] = useState(() =>
-    typeof window === "undefined" ? true : localStorage.getItem(CONTEXT_MODE_KEY) !== "0",
+    typeof window === "undefined" ? false : localStorage.getItem(CONTEXT_MODE_KEY) === "1",
   );
   // 拼写只作练习反馈，单独统计，不写入 SRS 调度（拼写对错 ≠ 认不认识）
   const [spellingStats, setSpellingStats] = useState({ right: 0, wrong: 0 });
