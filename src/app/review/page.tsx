@@ -141,10 +141,14 @@ export default function ReviewPage() {
   // 拼写抽查：只验证「认识」的声明（模糊本就没把握，再考拼写挫败感强），
   // 随机间隔 8~12 个非忘词一次；答后重新随机，避免固定节奏可被预期
   const [nextSpellingAt, setNextSpellingAt] = useState(() => 8 + Math.floor(Math.random() * 5));
-  // 拼写抽查开关（用户可在拼写页/休息屏/总结屏切换，持久化）
-  const [spellingEnabled, setSpellingEnabled] = useState(true);
+  // 拼写抽查开关（用户可在拼写页/休息屏/总结屏切换，持久化；默认开）
+  const [spellingEnabled, setSpellingEnabled] = useState(() =>
+    typeof window === "undefined" ? true : localStorage.getItem(SPELLING_ENABLED_KEY) !== "0",
+  );
   // 语境回忆开关（带原句的词用挖空句面回忆，持久化，默认开）
-  const [contextMode, setContextMode] = useState(true);
+  const [contextMode, setContextMode] = useState(() =>
+    typeof window === "undefined" ? true : localStorage.getItem(CONTEXT_MODE_KEY) !== "0",
+  );
   // 拼写只作练习反馈，单独统计，不写入 SRS 调度（拼写对错 ≠ 认不认识）
   const [spellingStats, setSpellingStats] = useState({ right: 0, wrong: 0 });
   const LAST_SESSION_KEY = "zhumo_last_session";
@@ -165,15 +169,6 @@ export default function ReviewPage() {
       const raw = localStorage.getItem(LAST_SESSION_KEY);
       // eslint-disable-next-line react-hooks/set-state-in-effect
       if (raw) setLastSession(JSON.parse(raw));
-    } catch {}
-  }, []);
-
-  useEffect(() => {
-    // 读取拼写抽查开关（默认开）
-    try {
-      setSpellingEnabled(localStorage.getItem(SPELLING_ENABLED_KEY) !== "0");
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setContextMode(localStorage.getItem(CONTEXT_MODE_KEY) !== "0");
     } catch {}
   }, []);
 
