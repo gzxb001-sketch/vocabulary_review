@@ -18,7 +18,12 @@ jobs:
           cache: npm
 
       - name: 安装依赖
-        run: npm ci
+        run: |
+          npm ci || {
+            echo "## npm ci 失败诊断" >> "$GITHUB_STEP_SUMMARY"
+            tail -60 "$HOME/.npm/_logs/"*.log >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+            exit 1
+          }
 
       - name: 依赖漏洞扫描
         run: npm audit --audit-level=critical
