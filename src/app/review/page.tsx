@@ -41,6 +41,7 @@ type ReviewItem = {
   meaningZh?: string;
   phonetic?: string;
   exampleSentence?: string;
+  reviewCount?: number;
   sourceType?: string | null;
   sourceNote?: string | null;
   sourceContext?: string | null;
@@ -170,7 +171,6 @@ export default function ReviewPage() {
   useEffect(() => {
     // 读取拼写抽查开关（默认开）
     try {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSpellingEnabled(localStorage.getItem(SPELLING_ENABLED_KEY) !== "0");
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setContextMode(localStorage.getItem(CONTEXT_MODE_KEY) !== "0");
@@ -824,9 +824,10 @@ export default function ReviewPage() {
     hiddenCount > 0 ||
     (current.synonyms?.length ?? 0) > 0 ||
     Boolean(current.sourceType || current.sourceNote);
-  // 语境挖空句面：未翻面 + 语境回忆开启 + 原句含目标词时使用
+  // 语境挖空句面：未翻面 + 语境回忆开启 + 该词至少复习过一次（全新词尚无记忆痕迹，
+  // 挖空是纯瞎猜；前测效应对有痕迹的词才发挥最好）
   const clozeSentence =
-    !revealed && contextMode && current.sourceContext
+    !revealed && contextMode && current.sourceContext && (current.reviewCount ?? 0) > 0
       ? makeCloze(current.sourceContext, current.displayText)
       : null;
 

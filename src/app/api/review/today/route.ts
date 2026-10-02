@@ -69,6 +69,7 @@ export async function GET() {
         meaningZh: item.word.meaningZh,
         phonetic: item.word.phonetic,
         exampleSentence: item.word.exampleSentence,
+        reviewCount: item.reviewCount,
         sourceType: item.word.sources[0]?.sourceType ?? null,
         sourceNote: item.word.sources[0]?.sourceNote ?? null,
         sourceContext: item.word.sources[0]?.sourceContext ?? null,
