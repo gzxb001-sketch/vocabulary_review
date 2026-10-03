@@ -75,6 +75,12 @@ export default function CapturePage() {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
+  // 本地 tesseract 识别结果（文本 + 预处理图 base64），供「云端精识」复用
+  const [ocrText, setOcrText] = useState("");
+  const [ocrImageB64, setOcrImageB64] = useState("");
+  // PDF 导入：提取出的全文（可编辑），用于生成候选词
+  const [pdfText, setPdfText] = useState("");
+  const [pdfPages, setPdfPages] = useState(0);
   const { isGuest } = useAuth();
 
   type Candidate = { text: string; isMarked?: boolean; lowConfidence?: boolean; sourceContext?: string };
@@ -160,6 +166,16 @@ export default function CapturePage() {
       const best = (sparseRun.data.confidence ?? 0) > (blockRun.data.confidence ?? 0) ? sparseRun : blockRun;
       const wordConf = buildWordConfidence(best.data as never);
 
+      setOcrText(best.data.text || "");
+      // 预处理图转 base64（不带 data: 前缀），供「云端精识」复用
+      const b64Final = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(String(reader.result || "").split(",")[1] || "");
+        reader.onerror = () => reject(new Error("图片转换失败"));
+        reader.readAsDataURL(processed);
+      });
+      setOcrImageB64(b64Final);
+
       const candidates = extractCandidatesFromRawText(best.data.text || "", wordConf);
       applyCandidates(
         candidates.map((item) => ({
@@ -194,6 +210,10 @@ export default function CapturePage() {
     const f = e.target.files?.[0] || null;
     setFile(f);
     setError("");
+    setOcrText("");
+    setOcrImageB64("");
+    setPdfText("");
+    setPdfPages(0);
     if (f) {
       setPreview(URL.createObjectURL(f));
     } else {
@@ -201,11 +221,94 @@ export default function CapturePage() {
     }
   }
 
+  // PDF 导入：pdf.js 提取文字版全文（每页一段），用户可编辑后一键生成候选词
+  async function handlePdfChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] || null;
+    setError("");
+    setPdfText("");
+    setPdfPages(0);
+    if (!f) return;
+    setLoading(true);
+    setProgress("解析 PDF...");
+    try {
+      const pdfjs = await import("pdfjs-dist");
+      pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+      const buf = await f.arrayBuffer();
+      const doc = await pdfjs.getDocument({ data: buf }).promise;
+      const maxPages = Math.min(doc.numPages, 30);
+      const pages: string[] = [];
+      for (let p = 1; p <= maxPages; p++) {
+        setProgress(`解析 PDF... 第 ${p}/${maxPages} 页`);
+        const page = await doc.getPage(p);
+        const content = await page.getTextContent();
+        const text = content.items
+          .map((it: unknown) => (it as { str?: string }).str ?? "")
+          .join(" ")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (text) pages.push(`【第 ${p} 页】\n${text}`);
+      }
+      if (pages.length === 0) {
+        setError("未能从 PDF 提取出文本——可能是扫描版 PDF（图片型），请改用拍照识别。");
+        return;
+      }
+      setPdfPages(pages.length);
+      setPdfText(pages.join("\n\n"));
+    } catch (err: unknown) {
+      setError("PDF 解析失败：" + ((err as Error)?.message || "未知错误"));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // PDF 全文 → 候选词（生僻词默认勾选，基础词默认取消，进入确认页）
+  function applyPdfCandidates() {
+    if (!pdfText.trim()) return;
+    const candidates = extractCandidatesFromRawText(pdfText).map((c) => ({
+      text: c.text,
+      isMarked: !c.isVerified, // 语义：常见基础词默认不选，生僻词默认选中
+      sourceContext: c.sourceContext,
+    }));
+    applyCandidates(candidates, Date.now());
+  }
+
+  // 云端精识：同一张预处理图交给百度 OCR（免费额度内），替换本地识别结果
+  async function handleCloudOcr() {
+    if (!ocrImageB64) return;
+    setError("");
+    setLoading(true);
+    setProgress("云端精识中...");
+    try {
+      const res = await fetch("/api/ocr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: ocrImageB64 }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.message || "云端识别失败，请稍后重试");
+        return;
+      }
+      const candidates = extractCandidatesFromRawText(data.text || "").map((c) => ({
+        text: c.text,
+        isMarked: !c.isVerified,
+        lowConfidence: c.lowConfidence,
+        sourceContext: c.sourceContext,
+      }));
+      applyCandidates(candidates, Date.now());
+    } catch {
+      setError("云端识别失败，请检查网络后重试");
+    } finally {
+      setLoading(false);
+      setProgress("");
+    }
+  }
+
   return (
     <main className="container fade-in">
       <div className="card stack">
-        <h1 className="title">拍照录词</h1>
-        <p className="subtitle">上传包含英文单词的图片，系统自动提取候选词条。</p>
+        <h1 className="title">拍照 / PDF 录词</h1>
+        <p className="subtitle">上传包含英文单词的图片或文字版 PDF，自动提取候选词条。</p>
 
         {isGuest && <GuestCta message="可先体验 OCR 识别，登录后即可保存到词库" />}
 
@@ -241,18 +344,51 @@ export default function CapturePage() {
               style={{ display: "none" }}
             />
           </label>
+          <label className="button button-secondary" style={{ cursor: "pointer", flex: 1, textAlign: "center" }}>
+            导入 PDF（文字版）
+            <input
+              type="file"
+              accept=".pdf,application/pdf"
+              onChange={handlePdfChange}
+              style={{ display: "none" }}
+            />
+          </label>
         </div>
 
-        {file ? <p className="muted">已选择：{file.name}</p> : null}
+        {file ? <p className="muted">已选择图片：{file.name}</p> : null}
+        {pdfPages > 0 && (
+          <p className="muted">已从 PDF 提取 {pdfPages} 页文本（可编辑下方内容后提取候选词）：</p>
+        )}
+        {pdfText ? (
+          <textarea
+            className="input"
+            rows={6}
+            value={pdfText}
+            onChange={(e) => setPdfText(e.target.value)}
+            style={{ resize: "vertical", fontSize: "var(--text-xs)" }}
+          />
+        ) : null}
 
-        <p className="muted">尽量平拍，确保英文文字清晰可见。</p>
+        <p className="muted">拍照请尽量平拍，确保英文文字清晰可见；PDF 支持文字版（扫描版请拍照）。</p>
 
         {error ? <p className="muted" style={{ color: "#dc2626" }}>{error}</p> : null}
         {loading && progress ? <p className="muted">{progress}</p> : null}
 
-        <button className="button" onClick={handleOcr} disabled={loading || !file}>
-          {loading ? "识别中..." : "开始识别"}
-        </button>
+        {!pdfText && (
+          <button className="button" onClick={handleOcr} disabled={loading || !file}>
+            {loading ? "识别中..." : "开始识别"}
+          </button>
+        )}
+        {ocrText && ocrImageB64 && !pdfText && (
+          <button className="button button-secondary" onClick={handleCloudOcr} disabled={loading}>
+            云端精识（更准确）
+          </button>
+        )}
+        {pdfText && (
+          <button className="button" onClick={applyPdfCandidates} disabled={loading}>
+            从 PDF 提取候选词 →
+          </button>
+        )}
       </div>
     </main>
   );
