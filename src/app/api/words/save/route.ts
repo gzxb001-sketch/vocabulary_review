@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/db";
-import type { Prisma } from "@prisma/client";
+import { prisma, getLibsqlClient } from "@/lib/db";
 import { createInitialSchedule } from "@/lib/scheduler";
 import { requireUserId, authError } from "@/lib/api-auth";
 
@@ -111,7 +110,7 @@ export async function POST(req: NextRequest) {
     const newScheduleRows: Array<Record<string, unknown>> = [];
     const newSourceRows: Array<Record<string, unknown>> = [];
     const newMeaningRows: Array<Record<string, unknown>> = [];
-    const wordUpdateOps: Prisma.PrismaPromise<unknown>[] = [];
+    const wordUpdates: Array<{ id: string; meaningZh: string | null; phonetic: string | null; partOfSpeech: string | null; exampleSentence: string | null }> = [];
 
     for (const n of norms) {
       const existing = byLemma.get(n.lemma) ?? byDisplay.get(n.displayText) ?? null;
@@ -144,17 +143,13 @@ export async function POST(req: NextRequest) {
           (!existing.partOfSpeech && !!n.partOfSpeech) ||
           (!existing.exampleSentence && !!n.exampleSentence);
         if (needsWordUpdate) {
-          wordUpdateOps.push(
-            prisma.word.update({
-              where: { id: existing.id },
-              data: {
-                meaningZh: existing.meaningZh || n.meaningZh,
-                phonetic: existing.phonetic || n.phonetic,
-                partOfSpeech: existing.partOfSpeech || n.partOfSpeech,
-                exampleSentence: existing.exampleSentence || n.exampleSentence,
-              },
-            }),
-          );
+          wordUpdates.push({
+            id: existing.id,
+            meaningZh: existing.meaningZh || n.meaningZh || null,
+            phonetic: existing.phonetic || n.phonetic || null,
+            partOfSpeech: existing.partOfSpeech || n.partOfSpeech || null,
+            exampleSentence: existing.exampleSentence || n.exampleSentence || null,
+          });
         }
         continue;
       }
@@ -209,14 +204,62 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 4. 单事务批量写：语句数 ≈ 常量级（不再随词数增长）
-    await prisma.$transaction([
-      prisma.word.createMany({ data: newWordRows as never }),
-      prisma.reviewSchedule.createMany({ data: newScheduleRows as never }),
-      prisma.wordSource.createMany({ data: newSourceRows as never }),
-      prisma.meaning.createMany({ data: newMeaningRows as never }),
-      ...wordUpdateOps,
-    ]);
+    // 4. libsql batch 原生批量写：一次 HTTP 请求打包全部 INSERT/UPDATE。
+    //    （Prisma 在 libsql 上每条语句独立往返，createMany/$transaction 均不批量；
+    //     实测 6 词 8.2s。batch 是 libsql 的批量 API，往返数变为常量级。）
+    const stmts: Array<{ sql: string; args: Array<string | number | null> }> = [];
+    const nowIso = new Date().toISOString();
+
+    for (const row of newWordRows) {
+      stmts.push({
+        sql: `INSERT INTO "Word" ("id","userId","lemma","displayText","meaningZh","phonetic","partOfSpeech","exampleSentence","note","status","updatedAt") VALUES (?,?,?,?,?,?,?,?,?,'active',?)`,
+        args: [
+          row.id, row.userId, row.lemma, row.displayText,
+          row.meaningZh ?? null, row.phonetic ?? null, row.partOfSpeech ?? null,
+          row.exampleSentence ?? null, row.note ?? null, nowIso,
+        ] as Array<string | number | null>,
+      });
+    }
+    for (const row of newScheduleRows) {
+      stmts.push({
+        sql: `INSERT INTO "ReviewSchedule" ("id","wordId","userId","nextReviewAt","intervalDays","reviewCount","easeScore","lastResult","updatedAt") VALUES (?,?,?,?,?,?,?,?,?)`,
+        args: [
+          crypto.randomUUID(), row.wordId, row.userId,
+          row.nextReviewAt ? new Date(row.nextReviewAt as string).toISOString() : nowIso,
+          row.intervalDays ?? 0, row.reviewCount ?? 0, row.easeScore ?? 2.5,
+          row.lastResult ?? null, nowIso,
+        ] as Array<string | number | null>,
+      });
+    }
+    for (const row of newSourceRows) {
+      stmts.push({
+        sql: `INSERT INTO "WordSource" ("id","wordId","userId","sourceType","sourceNote","sourceContext","imageId","createdAt") VALUES (?,?,?,?,?,?,?,?)`,
+        args: [
+          crypto.randomUUID(), row.wordId, row.userId, row.sourceType,
+          row.sourceNote ?? null, row.sourceContext ?? null, null, nowIso,
+        ] as Array<string | number | null>,
+      });
+    }
+    for (const row of newMeaningRows) {
+      stmts.push({
+        sql: `INSERT INTO "Meaning" ("id","wordId","userId","partOfSpeech","meaningZh","exampleSentence","exampleTranslation","isObscure","isHighFreq","sortOrder","createdAt") VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+        args: [
+          crypto.randomUUID(), row.wordId, row.userId, row.partOfSpeech ?? "", row.meaningZh,
+          row.exampleSentence ?? null, row.exampleTranslation ?? null,
+          (row.isObscure ? 1 : 0), (row.isHighFreq ? 1 : 0), row.sortOrder ?? 0, nowIso,
+        ] as Array<string | number | null>,
+      });
+    }
+    for (const u of wordUpdates) {
+      stmts.push({
+        sql: `UPDATE "Word" SET "meaningZh"=COALESCE("meaningZh",?), "phonetic"=COALESCE("phonetic",?), "partOfSpeech"=COALESCE("partOfSpeech",?), "exampleSentence"=COALESCE("exampleSentence",?) WHERE "id"=?`,
+        args: [u.meaningZh, u.phonetic, u.partOfSpeech, u.exampleSentence, u.id],
+      });
+    }
+
+    if (stmts.length > 0) {
+      await getLibsqlClient().batch(stmts, "write");
+    }
 
     return NextResponse.json({ saved, duplicates });
   } catch (error: any) {

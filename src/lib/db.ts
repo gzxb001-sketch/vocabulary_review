@@ -1,7 +1,8 @@
 import { PrismaClient } from '@prisma/client';
 import { PrismaLibSQL } from '@prisma/adapter-libsql';
+import { createClient, type Client } from '@libsql/client';
 
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined; libsql: Client | undefined };
 
 function createPrismaClient(): PrismaClient {
   const dbUrl = process.env.DATABASE_URL;
@@ -27,3 +28,18 @@ export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
     return typeof value === "function" ? value.bind(client) : value;
   },
 });
+
+/**
+ * 原生 libsql 写客户端：Prisma 的 libsql 适配器对每条语句都发独立 HTTP 往返
+ * （createMany/$transaction 均不批量），批量写入（batch）一次请求打包 N 条语句，
+ * 用于保存类接口的高吞吐路径。读取仍走 Prisma 保持类型安全。
+ */
+export function getLibsqlClient(): Client {
+  if (!globalForPrisma.libsql) {
+    const dbUrl = process.env.DATABASE_URL;
+    const token = process.env.TURSO_AUTH_TOKEN;
+    if (!dbUrl || !token) throw new Error('DATABASE_URL / TURSO_AUTH_TOKEN not set');
+    globalForPrisma.libsql = createClient({ url: dbUrl, authToken: token });
+  }
+  return globalForPrisma.libsql;
+}
